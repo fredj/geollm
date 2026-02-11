@@ -1,0 +1,220 @@
+# GeoLLM
+
+Natural language geographic query parsing using LLMs.
+
+## Overview
+
+GeoLLM transforms natural language location queries into structured geographic filters that can be used by search engines and spatial databases.
+It uses Large Language Models (LLMs) to understand multilingual queries and extract spatial relationships.
+
+**Key Principle:** GeoLLM's sole purpose is to extract the **geographic filter** from user queries. It does NOT handle feature/activity identification or search execution.
+
+### Example Use Case
+
+```python
+# User searches: "Hiking with children north of Lausanne"
+#
+# Parent application extracts:
+# - Activity: "Hiking with children" (handled by parent)
+# - Geographic text: "north of Lausanne" (or passes full query)
+#
+# GeoLLM extracts:
+result = parser.parse("Hiking with children north of Lausanne")
+# Returns: GeoQuery with spatial_relation="north_of", reference_location="Lausanne"
+# Ignores: "Hiking with children" (not a geographic filter)
+#
+# Parent application then:
+# - Converts GeoQuery to spatial filter (e.g., PostGIS query)
+# - Combines with activity filter
+# - Executes search: WHERE activity='hiking' AND ST_Within(geom, north_of_lausanne)
+```
+
+## Features
+
+- **Geographic Filters Only**: Extracts spatial relationships from queries, ignoring non-geographic content
+- **Multilingual Support**: Parse queries in English, German, French, Italian, and more
+- **Rich Spatial Relations**: Support for containment, buffer, and directional queries
+- **Structured Output**: Pydantic models with full type safety
+- **Flexible Configuration**: Customizable spatial relations and confidence thresholds
+- **LLM Provider Agnostic**: Works with OpenAI, Anthropic, or local models
+
+## What GeoLLM Does (and Doesn't Do)
+
+**✅ GeoLLM extracts:**
+
+- Spatial relations: "north of", "in", "near", etc.
+- Reference locations: "Lausanne", "Lake Geneva", etc.
+- Distance parameters: "within 5km", "around 2 miles", etc.
+
+**❌ GeoLLM does NOT handle:**
+
+- Feature/activity identification: "hiking", "restaurants", "hotels"
+- Attribute filtering: "with children", "vegetarian", "4-star"
+- Search execution or database queries
+- Geometry resolution (Phase 1 - planned for Phase 2+)
+
+**Integration Pattern:**
+Parent application handles feature/activity filtering and combines it with GeoLLM's geographic filter for complete search functionality.
+
+## Installation
+
+This project uses [uv](https://docs.astral.sh/uv/) for dependency management.
+
+```bash
+# Install dependencies
+uv sync
+
+# Or with development dependencies
+uv sync --extra dev
+```
+
+## Quick Start
+
+```python
+from langchain_openai import ChatOpenAI
+from geollm import GeoFilterParser
+import os
+
+# Initialize LLM
+llm = ChatOpenAI(
+    model="gpt-4o",
+    temperature=0,
+    api_key=os.getenv("OPENAI_API_KEY")
+)
+
+# Initialize parser
+parser = GeoFilterParser(
+    llm=llm,
+    confidence_threshold=0.6,
+    strict_mode=False
+)
+
+# Strict mode - raises error on low confidence
+parser = GeoFilterParser(
+    llm=llm,
+    confidence_threshold=0.8,
+    strict_mode=True
+)
+```
+
+### Custom LLM
+
+```python
+from langchain_anthropic import ChatAnthropic
+
+llm = ChatAnthropic(model="claude-3-5-sonnet-20241022")
+parser = GeoFilterParser(llm=llm)
+```
+
+### Custom Spatial Relations
+
+```python
+from geollm import SpatialRelationConfig, RelationConfig
+
+config = SpatialRelationConfig()
+config.register_relation(RelationConfig(
+    name="close_to",
+    category="buffer",
+    description="Very close proximity",
+    default_distance_m=1000,
+    buffer_from="center"
+))
+
+parser = GeoFilterParser(spatial_config=config)
+```
+
+## API Reference
+
+### GeoFilterParser
+
+Main class for parsing queries.
+
+**Methods:**
+
+- `parse(query: str) -> GeoQuery`: Parse a single query
+- `parse_batch(queries: List[str]) -> List[GeoQuery]`: Parse multiple queries
+- `get_available_relations(category: Optional[str]) -> List[str]`: List available relations
+- `describe_relation(name: str) -> str`: Get relation description
+
+### GeoQuery
+
+Structured output model representing the parsed geographic filter.
+
+**Attributes:**
+
+- `query_type`: Type of query (simple, compound, split, boolean)
+- `spatial_relation`: Spatial relationship (e.g., "north_of", "in", "near")
+- `reference_location`: Reference location (e.g., "Lausanne")
+- `buffer_config`: Buffer parameters (optional)
+- `confidence_breakdown`: Confidence scores
+- `original_query`: Original input text
+
+**Note:** Phase 1 returns only structured filter criteria. Phase 2+ will add geometry resolution (converting locations to actual polygons).
+
+## Available Spatial Relations
+
+### Containment
+
+- `in`: Exact boundary matching
+
+### Buffer/Proximity
+
+- `near`: 5km default radius
+- `around`: 3km default radius
+- `on_shores_of`: 1km ring buffer (excludes water body)
+- `along`: 500m buffer for linear features
+- `in_the_heart_of`: -500m erosion (central area)
+- `deep_inside`: -1000m erosion
+
+### Directional
+
+- **Cardinal**: `north_of`, `south_of`, `east_of`, `west_of`: 10km sector (90° each)
+- **Diagonal**: `northeast_of`, `southeast_of`, `southwest_of`, `northwest_of`: 10km sector (90° each)
+
+## Error Handling
+
+```python
+from geollm import ParsingError, UnknownRelationError, LowConfidenceError
+
+try:
+    result = parser.parse("some query")
+except ParsingError as e:
+    print(f"Failed to parse: {e}")
+    print(f"Raw LLM response: {e.raw_response}")
+except UnknownRelationError as e:
+    print(f"Unknown relation: {e.relation_name}")
+except LowConfidenceError as e:
+    print(f"Low confidence: {e.confidence}")
+    print(f"Reasoning: {e.reasoning}")
+```
+
+## Architecture
+
+See [ARCHITECTURE.md](ARCHITECTURE.md) for detailed system design.
+
+## Development
+
+```bash
+# Install dev dependencies
+pip install -e ".[dev]"
+
+# Run tests
+pytest
+
+# Format code
+ruff format geollm tests
+
+# Type checking
+mypy geollm
+
+# Linting
+ruff check geollm tests
+```
+
+## License
+
+MIT
+
+## Contributing
+
+Contributions welcome! Please ensure tests pass and code is formatted.

@@ -1,0 +1,192 @@
+"""
+Pydantic models for structured geographic query representation.
+"""
+
+from typing import Literal
+
+from pydantic import BaseModel, Field, model_validator
+
+
+class ConfidenceScore(BaseModel):
+    """
+    Confidence scores for different aspects of the parsed query.
+
+    Attributes:
+        overall: Overall confidence in the entire parse (0-1)
+        location_confidence: Confidence in identifying the reference location
+        relation_confidence: Confidence in identifying the spatial relation
+        reasoning: Optional explanation for low confidence scores
+    """
+
+    overall: float = Field(
+        ge=0.0,
+        le=1.0,
+        description="Overall confidence score for the entire query parse. "
+        "0.9-1.0 = highly confident, 0.7-0.9 = confident, 0.5-0.7 = uncertain, <0.5 = very uncertain",
+    )
+    location_confidence: float = Field(
+        ge=0.0,
+        le=1.0,
+        description="Confidence in correctly identifying the reference location",
+    )
+    relation_confidence: float = Field(
+        ge=0.0,
+        le=1.0,
+        description="Confidence in correctly identifying the spatial relation",
+    )
+    reasoning: str | None = Field(
+        None,
+        description="Explanation for confidence scores, especially if < 0.7. "
+        "For example: 'Ambiguous location name', 'Unclear spatial relationship', etc.",
+    )
+
+
+class ReferenceLocation(BaseModel):
+    """
+    A geographic reference location extracted from the query.
+
+    Attributes:
+        name: Location name as mentioned in the query
+        type: Type hint for location (optional, used for ranking not filtering)
+        type_confidence: Confidence in the type inference (0-1)
+        parent_context: Parent location for disambiguation
+    """
+
+    name: str = Field(description="Location name as mentioned in the query (e.g., 'Lausanne', 'Lake Geneva')")
+    # FIXME: enum ?
+    type: str | None = Field(
+        None,
+        description="Type hint for geographic feature (city, lake, mountain, canton, country, "
+        "train_station, airport, river, road, etc.). This is a HINT for ranking results, "
+        "NOT a strict filter. For ambiguous cases (e.g., 'Bern' could be city or canton, "
+        "'Rhone' could be river or road), provide your best guess or leave null. "
+        "The datasource will return multiple types ranked by relevance.",
+    )
+    type_confidence: float | None = Field(
+        None,
+        ge=0.0,
+        le=1.0,
+        description="Confidence in the type inference (0-1). High confidence (>0.8) when type is "
+        "explicit in query (e.g., 'Lake Geneva'). Low confidence (<0.6) when ambiguous "
+        "(e.g., 'Bern', 'Rhone'). Use spatial relation as hint: 'along X' → river/road, "
+        "'in X' → city/region, 'on X' → lake/mountain.",
+    )
+    parent_context: str | None = Field(
+        None,
+        description="Parent location for disambiguation. For example: 'France' for 'Paris, France' "
+        "vs 'Texas' for 'Paris, Texas'. Include when the location name could be ambiguous.",
+    )
+
+
+class BufferConfig(BaseModel):
+    """
+    Configuration for buffer-based spatial operations.
+
+    Attributes:
+        distance_m: Buffer distance in meters (can be negative for erosion)
+        buffer_from: Whether to buffer from center point or boundary
+        ring_only: If True, exclude the reference feature itself (donut shape)
+        inferred: Whether this config was inferred from defaults or explicitly stated
+    """
+
+    distance_m: float = Field(
+        description="Buffer distance in meters. Positive values expand outward (proximity), "
+        "negative values erode inward (e.g., 'in the heart of'). "
+        "Examples: 5000 = 5km radius, -500 = 500m erosion"
+    )
+    buffer_from: Literal["center", "boundary"] = Field(
+        description="Buffer origin. 'center' = buffer from centroid point (for proximity), "
+        "'boundary' = buffer from polygon boundary (for shores, along roads, erosion)"
+    )
+    ring_only: bool = Field(
+        False,
+        description="If True, exclude the reference feature itself to create a ring/donut shape. "
+        "Used for queries like 'on the shores of Lake X' (exclude the lake water itself). "
+        "Only valid with buffer_from='boundary'.",
+    )
+    inferred: bool = Field(
+        True,
+        description="True if this configuration was inferred from relation defaults. "
+        "False if the user explicitly specified distance or buffer parameters.",
+    )
+
+    @model_validator(mode="after")
+    def validate_ring_only(self) -> "BufferConfig":
+        """Validate that ring_only is only used with boundary buffers."""
+        if self.ring_only and self.buffer_from == "center":
+            raise ValueError("ring_only=True requires buffer_from='boundary' (cannot create ring from center point)")
+        return self
+
+
+class SpatialRelation(BaseModel):
+    """
+    A spatial relationship between target and reference.
+
+    Attributes:
+        relation: The spatial relation keyword
+        category: Category of spatial relation
+        explicit_distance: User-specified distance if provided
+    """
+
+    relation: str = Field(
+        description="Spatial relation keyword. Examples: 'in', 'near', 'around', 'north_of', "
+        "'on_shores_of', 'in_the_heart_of', etc. Use the exact relation name from the available list."
+    )
+    category: Literal["containment", "buffer", "directional"] = Field(
+        description="Category of spatial relation. "
+        "'containment' = exact boundary matching (in), "
+        "'buffer' = proximity or erosion operations (near, around, on_shores_of, in_the_heart_of), "
+        "'directional' = sector-based queries (north_of, south_of, east_of, west_of)"
+    )
+    explicit_distance: float | None = Field(
+        None,
+        description="Distance in meters if explicitly mentioned by user. "
+        "For example: 'within 5km' → 5000, 'within 500 meters' → 500. "
+        "Leave null if not explicitly stated.",
+    )
+
+
+class GeoQuery(BaseModel):
+    """
+    Root model representing a parsed geographic query.
+
+    This is the main output structure returned by the parser.
+
+    Attributes:
+        query_type: Type of query (simple for Phase 1)
+        spatial_relation: Spatial relationship to apply
+        reference_location: Reference location for the query
+        buffer_config: Buffer configuration (for buffer relations only)
+        confidence_breakdown: Confidence scores for the parse
+        original_query: Original input query text
+    """
+
+    query_type: Literal["simple", "compound", "split", "boolean"] = Field(
+        "simple",
+        description="Type of query. Phase 1 only supports 'simple'. "
+        "Future: 'compound' = multi-step, 'split' = area division, 'boolean' = AND/OR/NOT operations",
+    )
+    spatial_relation: SpatialRelation = Field(description="Spatial relationship to reference location")
+    reference_location: ReferenceLocation = Field(description="Reference location for the spatial query")
+    buffer_config: BufferConfig | None = Field(
+        None,
+        description="Buffer configuration. Required for buffer relations, null for others.",
+    )
+    confidence_breakdown: ConfidenceScore = Field(description="Confidence scores for different aspects of the parse")
+    original_query: str = Field(description="Original query text exactly as provided by the user")
+
+    @model_validator(mode="after")
+    def validate_buffer_config_consistency(self) -> "GeoQuery":
+        """Validate buffer_config consistency with relation category."""
+        # Buffer relations must have buffer_config
+        if self.spatial_relation.category == "buffer" and self.buffer_config is None:
+            raise ValueError(f"Buffer relation '{self.spatial_relation.relation}' requires buffer_config")
+
+        # Non-buffer relations should not have buffer_config
+        if self.spatial_relation.category != "buffer" and self.buffer_config is not None:
+            raise ValueError(
+                f"{self.spatial_relation.category} relation '{self.spatial_relation.relation}' "
+                f"should not have buffer_config"
+            )
+
+        return self

@@ -1,0 +1,41 @@
+[project]
+name = "geollm"
+version = "0.1.0"
+description = "Natural language geographic query parsing using LLMs"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [
+    {name = "GeoLLM Contributors"}
+]
+license = {text = "MIT"}
+dependencies = [
+    "langchain~=1.2",
+    "pydantic~=2.12",
+]
+
+[project.optional-dependencies]
+dev = [
+    "langchain-openai~=1.1",
+    "pytest~=9.0",
+    "pytest-cov~=7.0",
+    "ruff~=0.15",
+    "ty~=0.0",
+]
+
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.ruff]
+line-length = 120
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["F", "I", "E", "W", "UP", "C4", "ARG", "FAST"]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
