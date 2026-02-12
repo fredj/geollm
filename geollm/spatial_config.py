@@ -18,7 +18,7 @@ class RelationConfig:
         category: Type of spatial operation
         description: Human-readable description for LLM prompt
         default_distance_m: Default buffer distance in meters
-        buffer_from: Buffer origin (center or boundary)
+        buffer_from: Buffer origin
         ring_only: Exclude reference feature to create ring buffer
         sector_angle_degrees: Angular sector for directional queries
         direction: Direction name for directional queries

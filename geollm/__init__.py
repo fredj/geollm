@@ -18,6 +18,7 @@ from .exceptions import (
 # Models (for type hints and result access)
 from .models import (
     BufferConfig,
+    ConfidenceLevel,
     ConfidenceScore,
     GeoQuery,
     ReferenceLocation,
@@ -37,6 +38,7 @@ __all__ = [
     "ReferenceLocation",
     "BufferConfig",
     "ConfidenceScore",
+    "ConfidenceLevel",
     # Configuration
     "SpatialRelationConfig",
     "RelationConfig",

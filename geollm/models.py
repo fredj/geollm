@@ -2,36 +2,26 @@
 Pydantic models for structured geographic query representation.
 """
 
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field, model_validator
+
+ConfidenceLevel = Annotated[float, Field(ge=0.0, le=1.0, description="Confidence score between 0 and 1")]
 
 
 class ConfidenceScore(BaseModel):
     """
     Confidence scores for different aspects of the parsed query.
-
-    Attributes:
-        overall: Overall confidence in the entire parse (0-1)
-        location_confidence: Confidence in identifying the reference location
-        relation_confidence: Confidence in identifying the spatial relation
-        reasoning: Optional explanation for low confidence scores
     """
 
-    overall: float = Field(
-        ge=0.0,
-        le=1.0,
+    overall: ConfidenceLevel = Field(
         description="Overall confidence score for the entire query parse. "
         "0.9-1.0 = highly confident, 0.7-0.9 = confident, 0.5-0.7 = uncertain, <0.5 = very uncertain",
     )
-    location_confidence: float = Field(
-        ge=0.0,
-        le=1.0,
+    location_confidence: ConfidenceLevel = Field(
         description="Confidence in correctly identifying the reference location",
     )
-    relation_confidence: float = Field(
-        ge=0.0,
-        le=1.0,
+    relation_confidence: ConfidenceLevel = Field(
         description="Confidence in correctly identifying the spatial relation",
     )
     reasoning: str | None = Field(
@@ -44,12 +34,6 @@ class ConfidenceScore(BaseModel):
 class ReferenceLocation(BaseModel):
     """
     A geographic reference location extracted from the query.
-
-    Attributes:
-        name: Location name as mentioned in the query
-        type: Type hint for location (optional, used for ranking not filtering)
-        type_confidence: Confidence in the type inference (0-1)
-        parent_context: Parent location for disambiguation
     """
 
     name: str = Field(description="Location name as mentioned in the query (e.g., 'Lausanne', 'Lake Geneva')")
@@ -62,15 +46,14 @@ class ReferenceLocation(BaseModel):
         "'Rhone' could be river or road), provide your best guess or leave null. "
         "The datasource will return multiple types ranked by relevance.",
     )
-    type_confidence: float | None = Field(
+    type_confidence: ConfidenceLevel | None = Field(
         None,
-        ge=0.0,
-        le=1.0,
         description="Confidence in the type inference (0-1). High confidence (>0.8) when type is "
         "explicit in query (e.g., 'Lake Geneva'). Low confidence (<0.6) when ambiguous "
         "(e.g., 'Bern', 'Rhone'). Use spatial relation as hint: 'along X' → river/road, "
         "'in X' → city/region, 'on X' → lake/mountain.",
     )
+    # FIXME: is it useful ?
     parent_context: str | None = Field(
         None,
         description="Parent location for disambiguation. For example: 'France' for 'Paris, France' "
@@ -81,12 +64,6 @@ class ReferenceLocation(BaseModel):
 class BufferConfig(BaseModel):
     """
     Configuration for buffer-based spatial operations.
-
-    Attributes:
-        distance_m: Buffer distance in meters (can be negative for erosion)
-        buffer_from: Whether to buffer from center point or boundary
-        ring_only: If True, exclude the reference feature itself (donut shape)
-        inferred: Whether this config was inferred from defaults or explicitly stated
     """
 
     distance_m: float = Field(
@@ -121,11 +98,6 @@ class BufferConfig(BaseModel):
 class SpatialRelation(BaseModel):
     """
     A spatial relationship between target and reference.
-
-    Attributes:
-        relation: The spatial relation keyword
-        category: Category of spatial relation
-        explicit_distance: User-specified distance if provided
     """
 
     relation: str = Field(
@@ -149,16 +121,7 @@ class SpatialRelation(BaseModel):
 class GeoQuery(BaseModel):
     """
     Root model representing a parsed geographic query.
-
     This is the main output structure returned by the parser.
-
-    Attributes:
-        query_type: Type of query (simple for Phase 1)
-        spatial_relation: Spatial relationship to apply
-        reference_location: Reference location for the query
-        buffer_config: Buffer configuration (for buffer relations only)
-        confidence_breakdown: Confidence scores for the parse
-        original_query: Original input query text
     """
 
     query_type: Literal["simple", "compound", "split", "boolean"] = Field(

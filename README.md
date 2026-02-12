@@ -9,26 +9,6 @@ It uses Large Language Models (LLMs) to understand multilingual queries and extr
 
 **Key Principle:** GeoLLM's sole purpose is to extract the **geographic filter** from user queries. It does NOT handle feature/activity identification or search execution.
 
-### Example Use Case
-
-```python
-# User searches: "Hiking with children north of Lausanne"
-#
-# Parent application extracts:
-# - Activity: "Hiking with children" (handled by parent)
-# - Geographic text: "north of Lausanne" (or passes full query)
-#
-# GeoLLM extracts:
-result = parser.parse("Hiking with children north of Lausanne")
-# Returns: GeoQuery with spatial_relation="north_of", reference_location="Lausanne"
-# Ignores: "Hiking with children" (not a geographic filter)
-#
-# Parent application then:
-# - Converts GeoQuery to spatial filter (e.g., PostGIS query)
-# - Combines with activity filter
-# - Executes search: WHERE activity='hiking' AND ST_Within(geom, north_of_lausanne)
-```
-
 ## Features
 
 - **Geographic Filters Only**: Extracts spatial relationships from queries, ignoring non-geographic content
@@ -68,6 +48,18 @@ uv sync
 uv sync --extra dev
 ```
 
+## REPL
+
+An interactive REPL is available for testing queries interactively:
+
+Set your OpenAI API key before running:
+
+```bash
+export OPENAI_API_KEY='sk-...'
+uv run python repl.py
+```
+
+
 ## Quick Start
 
 ```python
@@ -95,15 +87,6 @@ parser = GeoFilterParser(
     confidence_threshold=0.8,
     strict_mode=True
 )
-```
-
-### Custom LLM
-
-```python
-from langchain_anthropic import ChatAnthropic
-
-llm = ChatAnthropic(model="claude-3-5-sonnet-20241022")
-parser = GeoFilterParser(llm=llm)
 ```
 
 ### Custom Spatial Relations
@@ -196,24 +179,24 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for detailed system design.
 
 ```bash
 # Install dev dependencies
-pip install -e ".[dev]"
+uv sync --extra dev
 
 # Run tests
-pytest
+uv run pytest
 
 # Format code
-ruff format geollm tests
+uv run ruff format geollm tests
 
 # Type checking
-mypy geollm
+uv run mypy geollm
 
 # Linting
-ruff check geollm tests
+uv run ruff check geollm tests
 ```
 
 ## License
 
-MIT
+BSD 3-Clause License
 
 ## Contributing
 
