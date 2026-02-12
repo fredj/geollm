@@ -114,3 +114,20 @@ def test_format_for_prompt():
 
     # Should include notes
     assert "Negative distances" in formatted
+
+
+def test_directional_angles():
+    """Test that directional relations have correct angle values."""
+    config = SpatialRelationConfig()
+
+    # Cardinal directions (0° = North, clockwise)
+    assert config.get_config("north_of").direction_angle_degrees == 0
+    assert config.get_config("east_of").direction_angle_degrees == 90
+    assert config.get_config("south_of").direction_angle_degrees == 180
+    assert config.get_config("west_of").direction_angle_degrees == 270
+
+    # Diagonal directions
+    assert config.get_config("northeast_of").direction_angle_degrees == 45
+    assert config.get_config("southeast_of").direction_angle_degrees == 135
+    assert config.get_config("southwest_of").direction_angle_degrees == 225
+    assert config.get_config("northwest_of").direction_angle_degrees == 315

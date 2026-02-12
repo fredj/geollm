@@ -21,7 +21,7 @@ class RelationConfig:
         buffer_from: Buffer origin
         ring_only: Exclude reference feature to create ring buffer
         sector_angle_degrees: Angular sector for directional queries
-        direction: Direction name for directional queries
+        direction_angle_degrees: Direction angle in degrees (0=North, 90=East, 180=South, 270=West, clockwise)
         applies_to: Feature types this relation is commonly used with
     """
 
@@ -32,7 +32,7 @@ class RelationConfig:
     buffer_from: Literal["center", "boundary"] | None = None
     ring_only: bool = False
     sector_angle_degrees: float | None = None
-    direction: str | None = None
+    direction_angle_degrees: float | None = None
     applies_to: list[str] | None = None
 
 
@@ -125,6 +125,7 @@ class SpatialRelationConfig:
         )
 
         # ===== DIRECTIONAL RELATIONS =====
+        # Convention: 0° = North, angles increase clockwise (90° = East, 180° = South, 270° = West)
         self.register_relation(
             RelationConfig(
                 name="north_of",
@@ -132,7 +133,7 @@ class SpatialRelationConfig:
                 description="Directional sector north of reference",
                 default_distance_m=10000,
                 sector_angle_degrees=90,
-                direction="north",
+                direction_angle_degrees=0,
             )
         )
 
@@ -143,7 +144,7 @@ class SpatialRelationConfig:
                 description="Directional sector south of reference",
                 default_distance_m=10000,
                 sector_angle_degrees=90,
-                direction="south",
+                direction_angle_degrees=180,
             )
         )
 
@@ -154,7 +155,7 @@ class SpatialRelationConfig:
                 description="Directional sector east of reference",
                 default_distance_m=10000,
                 sector_angle_degrees=90,
-                direction="east",
+                direction_angle_degrees=90,
             )
         )
 
@@ -165,7 +166,7 @@ class SpatialRelationConfig:
                 description="Directional sector west of reference",
                 default_distance_m=10000,
                 sector_angle_degrees=90,
-                direction="west",
+                direction_angle_degrees=270,
             )
         )
 
@@ -177,7 +178,7 @@ class SpatialRelationConfig:
                 description="Directional sector northeast of reference",
                 default_distance_m=10000,
                 sector_angle_degrees=90,
-                direction="northeast",
+                direction_angle_degrees=45,
             )
         )
 
@@ -188,7 +189,7 @@ class SpatialRelationConfig:
                 description="Directional sector southeast of reference",
                 default_distance_m=10000,
                 sector_angle_degrees=90,
-                direction="southeast",
+                direction_angle_degrees=135,
             )
         )
 
@@ -199,7 +200,7 @@ class SpatialRelationConfig:
                 description="Directional sector southwest of reference",
                 default_distance_m=10000,
                 sector_angle_degrees=90,
-                direction="southwest",
+                direction_angle_degrees=225,
             )
         )
 
@@ -210,44 +211,20 @@ class SpatialRelationConfig:
                 description="Directional sector northwest of reference",
                 default_distance_m=10000,
                 sector_angle_degrees=90,
-                direction="northwest",
+                direction_angle_degrees=315,
             )
         )
 
     def register_relation(self, config: RelationConfig) -> None:
-        """
-        Register a new spatial relation.
-
-        Args:
-            config: Relation configuration to register
-        """
+        """Register a new spatial relation."""
         self.relations[config.name] = config
 
     def has_relation(self, name: str) -> bool:
-        """
-        Check if a relation is registered.
-
-        Args:
-            name: Relation name to check
-
-        Returns:
-            True if relation exists, False otherwise
-        """
+        """Check if a relation is registered."""
         return name in self.relations
 
     def get_config(self, name: str) -> RelationConfig:
-        """
-        Get configuration for a relation.
-
-        Args:
-            name: Relation name
-
-        Returns:
-            RelationConfig for the specified relation
-
-        Raises:
-            UnknownRelationError: If relation is not registered
-        """
+        """Get configuration for a relation. Raises UnknownRelationError if not found."""
         if not self.has_relation(name):
             raise UnknownRelationError(
                 f"Unknown spatial relation: '{name}'. Available relations: {', '.join(sorted(self.relations.keys()))}",
@@ -256,26 +233,13 @@ class SpatialRelationConfig:
         return self.relations[name]
 
     def list_relations(self, category: Literal["containment", "buffer", "directional"] | None = None) -> list[str]:
-        """
-        List available relation names.
-
-        Args:
-            category: Optional category filter
-
-        Returns:
-            List of relation names
-        """
+        """List available relation names."""
         if category is None:
             return sorted(self.relations.keys())
         return sorted(r.name for r in self.relations.values() if r.category == category)
 
     def format_for_prompt(self) -> str:
-        """
-        Format relations for inclusion in LLM prompt.
-
-        Returns:
-            Formatted string describing all available relations
-        """
+        """Format relations for inclusion in LLM prompt."""
         lines = []
 
         # Group by category

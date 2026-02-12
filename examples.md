@@ -8,8 +8,11 @@ Balade dans le Lavaux
 
 Walking distance from Zurich main railway station
 Biking distance from Zurich main railway station
+
 Driving distance from Zurich main railway station
 
 Between Lausanne and Geneva
 
 South west of Lausanne
+
+10 minutes walk from Lausanne

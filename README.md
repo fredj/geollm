@@ -59,7 +59,6 @@ export OPENAI_API_KEY='sk-...'
 uv run python repl.py
 ```
 
-
 ## Quick Start
 
 ```python
@@ -193,11 +192,3 @@ uv run mypy geollm
 # Linting
 uv run ruff check geollm tests
 ```
-
-## License
-
-BSD 3-Clause License
-
-## Contributing
-
-Contributions welcome! Please ensure tests pass and code is formatted.

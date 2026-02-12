@@ -270,6 +270,54 @@ EXAMPLES: list[ExampleQuery] = [
             original_query="Hiking with children near Lake Geneva",
         ),
     ),
+    # Example 11: Contextual distance - walking (English)
+    ExampleQuery(
+        input="Walking distance from Zurich main railway station",
+        language="en",
+        description="Contextual distance 'walking distance' converted to 1km explicit distance",
+        output=GeoQuery(
+            query_type="simple",
+            spatial_relation=SpatialRelation(relation="near", category="buffer", explicit_distance=1000),
+            reference_location=ReferenceLocation(
+                name="Zurich main railway station",
+                type="train_station",
+                type_confidence=0.95,
+                parent_context=None,
+            ),
+            buffer_config=BufferConfig(distance_m=1000, buffer_from="center", ring_only=False, inferred=False),
+            confidence_breakdown=ConfidenceScore(
+                overall=0.90,
+                location_confidence=0.90,
+                relation_confidence=0.90,
+                reasoning="'Walking distance' converted to 1km buffer.",
+            ),
+            original_query="Walking distance from Zurich main railway station",
+        ),
+    ),
+    # Example 12: Contextual distance - biking (English)
+    ExampleQuery(
+        input="Biking distance from Lake Geneva",
+        language="en",
+        description="Contextual distance 'biking distance' converted to 5km explicit distance",
+        output=GeoQuery(
+            query_type="simple",
+            spatial_relation=SpatialRelation(relation="near", category="buffer", explicit_distance=5000),
+            reference_location=ReferenceLocation(
+                name="Lake Geneva",
+                type="lake",
+                type_confidence=0.95,
+                parent_context=None,
+            ),
+            buffer_config=BufferConfig(distance_m=5000, buffer_from="center", ring_only=False, inferred=False),
+            confidence_breakdown=ConfidenceScore(
+                overall=0.90,
+                location_confidence=0.90,
+                relation_confidence=0.90,
+                reasoning="'Biking distance' converted to 5km buffer.",
+            ),
+            original_query="Biking distance from Lake Geneva",
+        ),
+    ),
 ]
 
 

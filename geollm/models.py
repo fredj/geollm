@@ -10,9 +10,7 @@ ConfidenceLevel = Annotated[float, Field(ge=0.0, le=1.0, description="Confidence
 
 
 class ConfidenceScore(BaseModel):
-    """
-    Confidence scores for different aspects of the parsed query.
-    """
+    """Confidence scores for different aspects of the parsed query."""
 
     overall: ConfidenceLevel = Field(
         description="Overall confidence score for the entire query parse. "
@@ -32,9 +30,7 @@ class ConfidenceScore(BaseModel):
 
 
 class ReferenceLocation(BaseModel):
-    """
-    A geographic reference location extracted from the query.
-    """
+    """A geographic reference location extracted from the query."""
 
     name: str = Field(description="Location name as mentioned in the query (e.g., 'Lausanne', 'Lake Geneva')")
     # FIXME: enum ?
@@ -62,9 +58,7 @@ class ReferenceLocation(BaseModel):
 
 
 class BufferConfig(BaseModel):
-    """
-    Configuration for buffer-based spatial operations.
-    """
+    """Configuration for buffer-based spatial operations."""
 
     distance_m: float = Field(
         description="Buffer distance in meters. Positive values expand outward (proximity), "
@@ -96,9 +90,7 @@ class BufferConfig(BaseModel):
 
 
 class SpatialRelation(BaseModel):
-    """
-    A spatial relationship between target and reference.
-    """
+    """A spatial relationship between target and reference."""
 
     relation: str = Field(
         description="Spatial relation keyword. Examples: 'in', 'near', 'around', 'north_of', "

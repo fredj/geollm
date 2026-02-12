@@ -51,7 +51,7 @@ class GeoFilterParser:
         Initialize the parser.
 
         Args:
-            llm: LangChain LLM instance (required). Create with:
+            llm: LangChain LLM instance (required).
             spatial_config: Spatial relation configuration. If None, uses defaults
             confidence_threshold: Minimum confidence to accept (0-1)
             strict_mode: If True, raise error on low confidence. If False, warn only
@@ -79,12 +79,8 @@ class GeoFilterParser:
         self.prompt = self._build_prompt()
 
     def _build_structured_llm(self):
-        """
-        Create LLM with structured output using Pydantic model.
+        """Create LLM with structured output using Pydantic model."""
 
-        Returns:
-            LLM configured to return GeoQuery objects
-        """
         return self.llm.with_structured_output(
             GeoQuery,
             method="function_calling",  # Use function_calling for broader schema support
@@ -92,12 +88,8 @@ class GeoFilterParser:
         )
 
     def _build_prompt(self) -> ChatPromptTemplate:
-        """
-        Build prompt template with spatial relations and examples.
+        """Build prompt template with spatial relations and examples."""
 
-        Returns:
-            ChatPromptTemplate ready for formatting
-        """
         return build_prompt_template(spatial_config=self.spatial_config, include_examples=self.include_examples)
 
     def parse(self, query: str) -> GeoQuery:

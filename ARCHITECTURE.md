@@ -71,6 +71,148 @@ Main API class for parsing queries.
 - **Output:** Structured Pydantic models with validation
 - **Framework:** LangChain with structured output
 
+#### How the LLM Chooses Spatial Relations
+
+The LLM selects spatial relations through **semantic matching** based on relation descriptions provided in the system prompt. Here's the complete flow:
+
+**Step 1: Relation Definitions with Descriptions**
+
+Each spatial relation is defined in `spatial_config.py:51-216` with metadata including a `description` field:
+
+```python
+RelationConfig(
+    name="on_shores_of",
+    category="buffer",
+    description="Ring buffer around lake/water boundary, excluding the water body itself",
+    default_distance_m=1000,
+    buffer_from="boundary",
+    ring_only=True,
+    applies_to=["lake", "water_body", "sea"]  # Feature type hints
+)
+```
+
+**Step 2: Formatting for the Prompt**
+
+The `format_for_prompt()` method (`spatial_config.py:273-322`) transforms relations into structured text:
+
+```
+BUFFER RELATIONS:
+  • on_shores_of (default: 1000m) [ring buffer, from boundary]
+    Ring buffer around lake/water boundary, excluding the water body itself
+    (commonly used with: lake, water_body, sea)
+```
+
+**Step 3: Injection into System Prompt**
+
+The formatted relations are injected into the system prompt template (`prompts.py:11-90, 113-115`):
+
+```python
+system_prompt = SYSTEM_PROMPT.format(spatial_relations=spatial_relations_text)
+```
+
+The system prompt includes:
+
+- Complete list of available spatial relations with descriptions
+- Key guidelines: "When parsing queries, use ONLY the relations listed above"
+- Category distinctions (containment vs buffer vs directional)
+
+**Step 4: LLM Selection Process**
+
+When the LLM receives a query like "villages on shores of Lake Geneva":
+
+1. **Semantic Matching**: Matches query language to description semantics
+   - Query phrase: "on shores of"
+   - Description: "Ring buffer around lake/water boundary..."
+   - Match confidence: High
+
+2. **Context Clues**: Uses `applies_to` hints
+   - Reference feature: "Lake Geneva" (type: lake)
+   - Relation applies_to: ["lake", "water_body", "sea"]
+   - Contextual fit: Strong
+
+3. **Category Understanding**: Distinguishes relation types
+   - "in" = containment (exact boundary)
+   - "on_shores_of" = buffer (ring around boundary)
+   - "north_of" = directional (sector)
+
+4. **Default Distance Awareness**: Considers implicit distances
+   - "near" → 5km default
+   - "around" → 3km default
+   - "on_shores_of" → 1km default
+
+**Step 5: Structured Output**
+
+The LLM returns a structured `SpatialRelation` object:
+
+```json
+{
+  "relation": "on_shores_of",
+  "category": "buffer",
+  "explicit_distance": null
+}
+```
+
+**Step 6: Validation & Enrichment**
+
+The validation pipeline (`validators.py:12-76`) ensures correctness:
+
+1. **Relation Validation**: Checks if selected relation exists in config
+2. **Default Enrichment**: Applies technical parameters from `RelationConfig`
+   - `default_distance_m` → `BufferConfig.distance_m`
+   - `buffer_from` → `BufferConfig.buffer_from`
+   - `ring_only` → `BufferConfig.ring_only`
+
+**Description Design Patterns:**
+
+1. **Explicit Use Cases**: "Ring buffer around lake/water boundary..."
+2. **Distinguishing Similar Relations**: "near" (5km) vs "around" (3km)
+3. **Semantic Meaning**: "in_the_heart_of" = negative buffer/erosion
+4. **Feature Type Hints**: `applies_to=["river", "road"]` for "along"
+
+**Key Insight:** The architecture elegantly separates concerns:
+
+- **Descriptions** guide LLM semantic understanding (natural language → relation name)
+- **Configs** provide technical parameters (relation name → geometric operations)
+- **Validation** ensures LLM stays within allowed relations and enriches with defaults
+
+#### Context-Dependent Distance Handling
+
+GeoLLM recognizes context-dependent distance expressions and converts them to explicit buffer distances:
+
+**Supported Expressions:**
+- **Walking distance**: 1km (typical 10-15 minute walk)
+- **Biking/Cycling distance**: 5km (typical 10-15 minute bike ride)
+
+**How It Works:**
+
+1. LLM recognizes contextual distance phrase in query
+2. Converts to explicit distance value via prompt guidance (`prompts.py:65-71`)
+3. Sets `explicit_distance` field (e.g., 1000 or 5000 meters)
+4. Validation pipeline applies this as buffer distance (`validators.py:64-74`)
+5. `inferred=False` (treated as user-specified, not default)
+
+**Example:**
+```python
+# Query: "Walking distance from Zurich main railway station"
+GeoQuery(
+    spatial_relation=SpatialRelation(
+        relation="near",
+        explicit_distance=1000  # ← Converted from "walking distance"
+    ),
+    buffer_config=BufferConfig(
+        distance_m=1000,
+        inferred=False  # ← Treated as user-specified
+    )
+)
+```
+
+**Implementation:**
+- **Prompt guidance**: System prompt includes explicit instructions to recognize and convert these phrases
+- **Few-shot examples**: Examples 11-12 in `examples.py` demonstrate the expected behavior
+- **Validation**: Standard pipeline handles converted distances like explicit user-specified values
+
+**Extension Point**: Future support for additional contextual distances (e.g., "driving distance", time-based like "30 minute walk") can be added by extending the prompt template and few-shot examples.
+
 ### 3. Data Models (Pydantic v2)
 
 ```python

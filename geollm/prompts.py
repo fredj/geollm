@@ -65,6 +65,9 @@ Location Disambiguation:
 Distance Extraction:
 - Extract explicit distances when mentioned: "within 5km" → explicit_distance=5000
 - Convert to meters: "5km" → 5000, "500 meters" → 500, "2 miles" → 3219
+- Recognize contextual distances and convert to explicit values:
+  * "walking distance" → explicit_distance=1000 (typical 10-15 minute walk)
+  * "biking distance" / "cycling distance" → explicit_distance=5000 (typical 10-15 minute bike ride)
 - Leave null if not explicitly stated (defaults will be applied)
 
 Buffer Configuration:
