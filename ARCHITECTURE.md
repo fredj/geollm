@@ -2,404 +2,188 @@
 
 ## Core Principle
 
-**GeoLLM has ONE responsibility: Extract geographic filters from natural language queries.**
+**GeoLLM has ONE responsibility: Extract & Execute geographic filters from natural language queries.**
 
 ### What GeoLLM Does ✅
 
-- Parse spatial relations: "north of", "in", "near", "within 5km"
-- Extract reference locations: "Lausanne", "Lake Geneva"
-- Parse distance parameters: "within 5km", "2 kilometers"
-- Return structured geographic filter criteria
+- **Layer 1: Parsing** - Extract structured `GeoQuery` from text ("north of Lausanne")
+- **Layer 2: Resolution** - Resolve "Lausanne" to a physical geometry using a datasource
+- **Layer 3: Spatial Operations** - Transform that geometry using the spatial relation (e.g., generate a "north" sector)
 
 ### What GeoLLM Does NOT Do ❌
 
-- Subject/feature identification ("hiking", "restaurants", "hotels")
-- Attribute filtering ("with children", "vegetarian", "4-star")
-- Search execution or result ranking
-- Geometry resolution (future enhancement)
+- Subject/feature identification ("hiking", "restaurants")
+- Attribute filtering ("with children", "vegetarian")
+- Final search execution or result ranking (this is the parent app's job)
 
 ---
 
 ## Integration Pattern
 
-GeoLLM is designed to work within larger search systems:
+GeoLLM fits into a search pipeline:
 
 ```
 User Query: "Hiking with children north of Lausanne"
      ↓
 Parent System → Extracts: Activity="Hiking", Audience="children"
      ↓
-GeoLLM → Extracts: relation="north_of", location="Lausanne"
+GeoLLM.parser → Parses: relation="north_of", location="Lausanne"
      ↓
-Parent System → Combines: activity + audience + geo_filter
+GeoLLM.datasource → Resolves: "Lausanne" → Point(6.63, 46.52)
      ↓
-Database Query → Results
+GeoLLM.spatial → Transforms: Point → Polygon(North Sector)
+     ↓
+Parent System → Database Query: WHERE activity='hiking' AND ST_Intersects(location, sector_polygon)
 ```
-
-**Example:** Outdoor Activity Search Engine
-
-- Parent system: "Hiking with children" → activity filter
-- GeoLLM: "north of Lausanne" → geographic filter
-- Combined query: WHERE activity='hiking' AND audience='children' AND ST_Within(geom, north_of_lausanne)
 
 ---
 
 ## Component Overview
 
-### 1. GeoFilterParser (Entry Point)
+### 1. GeoFilterParser (Layer 1)
 
-Main API class for parsing queries.
+Extracts intent from text using an LLM.
 
-**Configuration:**
+- **Input**: "near Bern"
+- **Output**: `GeoQuery` object (Pydantic model)
+- **Key Features**:
+  - Multilingual support
+  - 12 spatial relations (containment, buffer, directional)
+  - Distance inference ("10 min walk" → 833m)
+  - Confidence scoring
 
-- LLM provider (OpenAI, Anthropic, local models)
-- Spatial relation config
-- Confidence threshold
-- Strict/permissive mode
+### 2. GeoDataSource (Layer 2)
 
-**Methods:**
+Resolves location names to geometries.
 
-- `parse(query: str) -> GeoQuery` - Parse single query
-- `parse_batch(queries: List[str]) -> List[GeoQuery]` - Parse multiple
-- `get_available_relations(category: Optional[str]) -> List[str]` - List relations
-- `describe_relation(name: str) -> str` - Get relation description
+- **Interface**: `GeoDataSource` Protocol (returns `list[dict]` - standard GeoJSON)
+- **Type System**: Each datasource declares its own list of available types via `get_available_types()`
+  - Types are organized in a semantic hierarchy (water, landforms, settlement, etc.)
+  - Supports fuzzy matching: query `type="water"` matches lake, river, pond, spring, etc.
+  - See `location_types.py` for the standard type hierarchy
+- **Implementations**:
+  - `SwissNames3DSource`: Wraps swisstopo data (Shapefile/GDB). Handles:
+    - Fuzzy/Exact search by name
+    - Type filtering with fuzzy matching (lake, city, canton, etc.)
+    - Coordinate conversion (CH1903+ → WGS84)
+    - ~80 grouped geographic types
 
-### 2. LLM Integration
+### 3. Spatial Operations (Layer 3)
 
-- **Model:** Configurable (default: GPT-4o with strict schema)
-- **Prompt:** Multilingual input handling with few-shot examples
-- **Output:** Structured Pydantic models with validation
-- **Framework:** LangChain with structured output
+Transforms reference geometries into search areas.
 
-#### How the LLM Chooses Spatial Relations
+- **Function**: `apply_spatial_relation(geometry, relation, buffer_config)`
+- **Operations**:
+  - **Containment**: Passthrough (exact boundary)
+  - **Buffer**: Positive (expand), Negative (erode), Ring (donut)
+  - **Directional**: Angular sector wedges (e.g., North = 90° wedge)
+- **Technology**: Uses `shapely` + `pyproj` internally, IO is standard WGS84 GeoJSON.
 
-The LLM selects spatial relations through **semantic matching** based on relation descriptions provided in the system prompt. Here's the complete flow:
+---
 
-**Step 1: Relation Definitions with Descriptions**
+## Data Models
 
-Each spatial relation is defined in `spatial_config.py:51-216` with metadata including a `description` field:
+### GeoQuery (Parse Result)
 
 ```python
-RelationConfig(
-    name="on_shores_of",
-    category="buffer",
-    description="Ring buffer around lake/water boundary, excluding the water body itself",
-    default_distance_m=1000,
-    buffer_from="boundary",
-    ring_only=True,
-    applies_to=["lake", "water_body", "sea"]  # Feature type hints
+GeoQuery(
+    spatial_relation=SpatialRelation(relation="north_of", ...),
+    reference_location=ReferenceLocation(name="Lausanne", ...),
+    buffer_config=BufferConfig(distance_m=10000, ...),
+    confidence_breakdown=...
 )
 ```
 
-**Step 2: Formatting for the Prompt**
+### GeoJSON Feature (Resolution Result)
 
-The `format_for_prompt()` method (`spatial_config.py:273-322`) transforms relations into structured text:
-
-```
-BUFFER RELATIONS:
-  • on_shores_of (default: 1000m) [ring buffer, from boundary]
-    Ring buffer around lake/water boundary, excluding the water body itself
-    (commonly used with: lake, water_body, sea)
-```
-
-**Step 3: Injection into System Prompt**
-
-The formatted relations are injected into the system prompt template (`prompts.py:11-90, 113-115`):
-
-```python
-system_prompt = SYSTEM_PROMPT.format(spatial_relations=spatial_relations_text)
-```
-
-The system prompt includes:
-
-- Complete list of available spatial relations with descriptions
-- Key guidelines: "When parsing queries, use ONLY the relations listed above"
-- Category distinctions (containment vs buffer vs directional)
-
-**Step 4: LLM Selection Process**
-
-When the LLM receives a query like "villages on shores of Lake Geneva":
-
-1. **Semantic Matching**: Matches query language to description semantics
-   - Query phrase: "on shores of"
-   - Description: "Ring buffer around lake/water boundary..."
-   - Match confidence: High
-
-2. **Context Clues**: Uses `applies_to` hints
-   - Reference feature: "Lake Geneva" (type: lake)
-   - Relation applies_to: ["lake", "water_body", "sea"]
-   - Contextual fit: Strong
-
-3. **Category Understanding**: Distinguishes relation types
-   - "in" = containment (exact boundary)
-   - "on_shores_of" = buffer (ring around boundary)
-   - "north_of" = directional (sector)
-
-4. **Default Distance Awareness**: Considers implicit distances
-   - "near" → 5km default
-   - "around" → 3km default
-   - "on_shores_of" → 1km default
-
-**Step 5: Structured Output**
-
-The LLM returns a structured `SpatialRelation` object:
+Standard GeoJSON dictionary structure:
 
 ```json
 {
-  "relation": "on_shores_of",
-  "category": "buffer",
-  "explicit_distance": null
+  "type": "Feature",
+  "id": "uuid-123",
+  "geometry": { "type": "Point", "coordinates": [6.63, 46.52] },
+  "properties": {
+    "name": "Lausanne",
+    "type": "city",
+    "confidence": 1.0
+  }
 }
 ```
 
-**Step 6: Validation & Enrichment**
+---
 
-The validation pipeline (`validators.py:12-76`) ensures correctness:
+## Spatial Relations (12 Total)
 
-1. **Relation Validation**: Checks if selected relation exists in config
-2. **Default Enrichment**: Applies technical parameters from `RelationConfig`
-   - `default_distance_m` → `BufferConfig.distance_m`
-   - `buffer_from` → `BufferConfig.buffer_from`
-   - `ring_only` → `BufferConfig.ring_only`
+| Category | Relations | Behavior |
+|----------|-----------|----------|
+| **Containment** | `in` | Exact geometry match |
+| **Buffer** | `near`, `around`, `along` | Circular/Linear buffer |
+| **Ring** | `on_shores_of` | Buffer - Original (Donut) |
+| **Erosion** | `in_the_heart_of`, `deep_inside` | Negative buffer (shrink) |
+| **Directional** | `north_of`, `south_of`, ... | 90° Sector Wedge |
 
-**Description Design Patterns:**
+---
 
-1. **Explicit Use Cases**: "Ring buffer around lake/water boundary..."
-2. **Distinguishing Similar Relations**: "near" (5km) vs "around" (3km)
-3. **Semantic Meaning**: "in_the_heart_of" = negative buffer/erosion
-4. **Feature Type Hints**: `applies_to=["river", "road"]` for "along"
+## Type System & Hierarchy
 
-**Key Insight:** The architecture elegantly separates concerns:
+GeoLLM uses a **datasource-defined type system** with semantic grouping and fuzzy matching.
 
-- **Descriptions** guide LLM semantic understanding (natural language → relation name)
-- **Configs** provide technical parameters (relation name → geometric operations)
-- **Validation** ensures LLM stays within allowed relations and enriches with defaults
+### Type Hierarchy
 
-#### Context-Dependent Distance Handling
+Types are organized into 10 semantic categories to support fuzzy matching:
 
-GeoLLM recognizes context-dependent distance expressions and converts them to explicit buffer distances using standard transportation speeds:
+| Category | Examples |
+|----------|----------|
+| **water** | lake, river, pond, spring, waterfall, glacier, dam |
+| **landforms** | mountain, peak, hill, pass, valley, ridge, plain, boulder |
+| **natural** | cave, forest, nature_reserve, alpine_pasture |
+| **island** | island, peninsula |
+| **administrative** | country, canton, municipality, region, area |
+| **settlement** | city, town, village, hamlet, district |
+| **building** | building, religious_building, tower, monument, fountain |
+| **transport** | train_station, bus_stop, airport, road, bridge, railway, ferry, lift |
+| **amenity** | restaurant, hospital, school, parking, park, swimming_pool, zoo, camping |
+| **infrastructure** | power_plant, wastewater_treatment, landfill, quarry |
+| **other** | viewpoint, field_name, local_name, historical_site |
 
-**Speed Definitions:**
-- **Walking**: 5 km/h
-- **Biking**: 20 km/h
+### How It Works
 
-**Supported Expressions:**
+1. **Datasource Declaration**: Each datasource declares available types via `get_available_types()`
+   ```python
+   source = SwissNames3DSource("data/")
+   available_types = source.get_available_types()
+   # → ["lake", "river", "city", "mountain", "peak", ...]
+   ```
 
-1. **Time-based distances**: "X minutes [walk|bike] from [location]"
-   - LLM calculates distance using speed formula: distance = minutes × (speed_km/h × 1000 / 60)
-   - Examples:
-     - "10 minutes walk from X" → 10 × (5000/60) ≈ 833m
-     - "15 minutes bike from X" → 15 × (20000/60) = 5000m
+2. **Fuzzy Matching**: Type hints can be either concrete or categorical
+   ```python
+   results = source.search("Geneva", type="water")     # Matches: lake, river, pond, etc.
+   results = source.search("Geneva", type="lake")      # Matches: only "lake"
+   results = source.search("Geneva", type="settlement") # Matches: city, town, village, etc.
+   ```
 
-2. **Contextual distances**: "[walking|biking] distance from [location]"
-   - Walking distance → 1000m
-   - Biking distance → 5000m
+3. **LLM Integration**: The LLM is aware of the type hierarchy and uses it for better type inference
+   - Can suggest types from the hierarchy when parsing queries
+   - Understands categorical types for more flexible matching
 
-3. **Explicit numeric distances**: "within 5km", "500 meters", "2 miles"
-   - Directly converted to meters
+### Defining Types for a New Datasource
 
-**How It Works:**
-
-1. LLM recognizes distance expression (time-based, contextual, or numeric)
-2. Calculates explicit distance using speed definitions or contextual defaults
-3. Sets `explicit_distance` field with computed value
-4. Validation pipeline applies this as buffer distance (`validators.py:64-74`)
-5. `inferred=False` (treated as user-specified, not default)
-
-**Examples:**
-```python
-# Query: "10 minutes walk from Zurich"
-GeoQuery(
-    spatial_relation=SpatialRelation(
-        relation="near",
-        explicit_distance=833  # ← Computed: 10 min × (5 km/h / 60)
-    ),
-    buffer_config=BufferConfig(
-        distance_m=833,
-        inferred=False
-    )
-)
-
-# Query: "Walking distance from Zurich"
-GeoQuery(
-    spatial_relation=SpatialRelation(
-        relation="near",
-        explicit_distance=1000  # ← Contextual default
-    ),
-    buffer_config=BufferConfig(
-        distance_m=1000,
-        inferred=False
-    )
-)
-
-# Query: "15 minutes bike from Bern"
-GeoQuery(
-    spatial_relation=SpatialRelation(
-        relation="near",
-        explicit_distance=5000  # ← Computed: 15 min × (20 km/h / 60)
-    ),
-    buffer_config=BufferConfig(
-        distance_m=5000,
-        inferred=False
-    )
-)
-```
-
-**Implementation:**
-- **Prompt guidance**: System prompt defines speeds and calculation formula (`prompts.py:65-76`)
-- **Few-shot examples**: Examples 11-12 in `examples.py` demonstrate expected behavior
-- **Validation**: Standard pipeline handles converted distances like explicit user-specified values
-
-**Extension Point**: Future support for additional modes or time formats (hours, seconds) can be added by extending speed definitions in the prompt template.
-
-### 3. Data Models (Pydantic v2)
+When adding a new datasource (e.g., OpenStreetMap), implement the protocol:
 
 ```python
-GeoQuery(
-    query_type: str,                    # "simple" (future: "compound", etc)
-    spatial_relation: SpatialRelation,
-    reference_location: ReferenceLocation,
-    buffer_config: Optional[BufferConfig],
-    confidence_breakdown: ConfidenceScore,
-    original_query: str
-)
-
-SpatialRelation(
-    relation: str,                      # e.g., "north_of", "in", "near"
-    category: str,                      # "containment", "buffer", "directional"
-    description: str
-)
-
-ReferenceLocation(
-    name: str,                          # Location name as mentioned in query
-    type: str,                          # "city", "lake", "region" (optional)
-    type_confidence: float,             # Confidence in type (0-1)
-)
-
-BufferConfig(
-    distance_m: int,                    # Positive (expand) or negative (erode)
-    buffer_from: str,                   # "center" or "boundary"
-    ring_only: bool                     # true for ring buffers
-)
-
-ConfidenceScore(
-    overall: float,
-    spatial_relation_confidence: float,
-    reference_location_confidence: float,
-    reasoning: str
-)
+class MyDataSource:
+    def get_available_types(self) -> list[str]:
+        """Return concrete types this datasource can return."""
+        return ["lake", "river", "city", "restaurant", "hospital"]
+    
+    def search(self, name: str, type: str | None = None, max_results: int = 10):
+        # Map native types to standard hierarchy
+        # Use location_types.get_matching_types(type) for fuzzy matching
+        pass
 ```
 
-### 4. Spatial Relations (12 Total)
-
-#### Containment (2)
-
-- `in` - Exact boundary matching
-
-#### Buffer/Proximity (6)
-
-- `near` - 5km radius from center
-- `around` - 3km radius from center
-- `on_shores_of` - 1km ring buffer around boundary
-- `along` - 500m buffer along linear features
-- `in_the_heart_of` - -500m erosion (central area)
-- `deep_inside` - -1km erosion (deep interior)
-
-#### Directional (8)
-
-- **Cardinal**: `north_of`, `south_of`, `east_of`, `west_of` (10km, 90° sectors)
-- **Diagonal**: `northeast_of`, `southeast_of`, `southwest_of`, `northwest_of` (10km, 90° sectors)
-
-**Buffer Notes:**
-
-- Positive buffers expand outward
-- Negative buffers erode inward
-- Ring buffers (`ring_only: true`) exclude the reference feature
-- `buffer_from` determines whether buffer originates from center or boundary
-
-### 5. Processing Pipeline
-
-```
-Raw Query Text
-    ↓
-LangChain LLM Call (with prompt + examples)
-    ↓
-Structured Output Parsing (Pydantic validation)
-    ↓
-Business Logic Validation
-    ├─ Check relation is registered
-    ├─ Apply default parameters
-    └─ Check confidence thresholds
-    ↓
-Return GeoQuery (or raise error)
-```
-
-### 6. Validation
-
-**Schema Validation:** Automatic via Pydantic
-
-- Type checking
-- Required field checking
-- Format validation
-
-**Business Logic Validation:**
-
-- Is spatial_relation registered in config?
-- Are required parameters present?
-- Does confidence meet threshold?
-- Strict vs permissive mode handling
-
----
-
-## Error Handling
-
-| Error | Cause | Response |
-|-------|-------|----------|
-| ParsingError | LLM failed to parse | Return error with raw response |
-| ValidationError | Schema mismatch | Return validation error details |
-| UnknownRelationError | Relation not registered | Return available relations |
-| LowConfidenceError | Confidence below threshold (strict mode) | Raise or warn based on mode |
-
----
-
-## Phase 1 Scope
-
-**What's Implemented:**
-
-- ✅ Natural language → GeoQuery (Pydantic model)
-- ✅ Multilingual input handling
-- ✅ 12 spatial relations
-- ✅ Confidence scoring with reasoning
-- ✅ Flexible configuration
-- ✅ Comprehensive validation
-
-**What's NOT Implemented (Future):**
-
-- ❌ Geometry resolution (converting locations to polygons)
-- ❌ Data source integration (SwissNames3D, OpenStreetMap)
-- ❌ Complex query types (compound, boolean, nested)
-- ❌ Target feature extraction (handled by parent system)
-
----
-
-## Configuration Points
-
-- LLM model selection and parameters
-- Spatial relation defaults (distances, buffer settings)
-- Confidence thresholds and mode (strict/permissive)
-- Custom relation registration
-- Language and localization
-
----
-
-## Extension Points
-
-- Add new spatial relations
-- Configure existing relations (distances, angles)
-- Custom validation rules
-- Pre/post-processing hooks
-- Language-specific handling
-- Future: Complex query handlers
+See `location_types.py` for the complete type hierarchy and utilities.
 
 ---
 
@@ -407,23 +191,32 @@ Return GeoQuery (or raise error)
 
 ```
 geollm/
-├── parser.py              # Main API entry point
-├── models.py              # Pydantic models
-├── spatial_config.py      # Relations registry (12 relations)
-├── prompts.py            # LLM prompt templates
-├── examples.py           # Few-shot examples (8, multilingual)
-├── validators.py         # Validation pipeline
-├── exceptions.py         # Error hierarchy
-└── __init__.py          # Public exports
+├── parser.py              # Layer 1: LLM Parser
+├── models.py              # Pydantic models for Layer 1
+├── spatial_config.py      # Spatial relation definitions
+├── prompts.py             # LLM prompts
+├── validators.py          # Validation pipeline
+├── datasources/           # Layer 2: Data Resolution
+│   ├── protocol.py        # GeoDataSource Protocol
+│   ├── location_types.py  # Type hierarchy & fuzzy matching
+│   └── swissnames3d.py    # SwissNames3D Implementation
+├── spatial.py             # Layer 3: Geometry Transformation
+└── __init__.py            # Public exports
 ```
 
 ---
 
-## Next Steps (Phase 2+)
+## Configuration
 
-When ready to expand:
+- **LLM**: Provider, Model, Temperature
+- **Spatial**: Default distances, buffer offsets
+- **Datasource**: Path to SwissNames3D data file
 
-1. Data source interface (abstract base)
-2. SwissNames3D adapter (location resolution)
-3. Query execution (geometric operations)
-4. Result aggregation (geometry collection)
+---
+
+## Status
+
+- ✅ **Layer 1 (Parser)**: Complete
+- ✅ **Layer 2 (Datasource)**: Complete (SwissNames3D implemented)
+- ✅ **Layer 3 (Spatial)**: Complete (Shapely-based ops)
+- ✅ **Integration**: Full flow implemented

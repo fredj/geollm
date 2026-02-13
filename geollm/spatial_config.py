@@ -125,6 +125,11 @@ class SpatialRelationConfig:
         )
 
         # ===== DIRECTIONAL RELATIONS =====
+        # All directional relations use consistent defaults:
+        # - Distance: 10km radius (default_distance_m=10000)
+        # - Sector: 90° angular wedge (sector_angle_degrees=90)
+        # - Origin: Centroid of reference location (buffer_from="center" set in enrich_with_defaults)
+        # These defaults are applied automatically by enrich_with_defaults() for any directional query.
         # Convention: 0° = North, angles increase clockwise (90° = East, 180° = South, 270° = West)
         self.register_relation(
             RelationConfig(

@@ -35,8 +35,11 @@ def enrich_with_defaults(geo_query: GeoQuery, spatial_config: SpatialRelationCon
     """
     Apply default parameters from configuration if not explicitly set.
 
-    For buffer relations, if buffer_config is missing or has inferred=True,
+    For buffer and directional relations, if buffer_config is missing or has inferred=True,
     populate with defaults from the relation configuration.
+
+    Directional relations use consistent 10km radius with 90° sector angle defaults.
+    Buffer relations use relation-specific defaults (near=5km, around=3km, etc.).
 
     Args:
         geo_query: Parsed query to enrich
@@ -47,8 +50,8 @@ def enrich_with_defaults(geo_query: GeoQuery, spatial_config: SpatialRelationCon
     """
     relation_config = spatial_config.get_config(geo_query.spatial_relation.relation)
 
-    # Only enrich buffer relations
-    if relation_config.category != "buffer":
+    # Enrich buffer and directional relations
+    if relation_config.category not in ("buffer", "directional"):
         return geo_query
 
     # If no buffer_config at all, create from defaults

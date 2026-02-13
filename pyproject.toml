@@ -11,6 +11,9 @@ license = {text = "MIT"}
 dependencies = [
     "langchain~=1.2",
     "pydantic~=2.12",
+    "shapely>=2.0",
+    "pyproj>=3.6",
+    "geopandas>=0.14",
 ]
 
 [project.optional-dependencies]
@@ -34,8 +37,18 @@ target-version = "py313"
 select = ["F", "I", "E", "W", "UP", "C4", "ARG", "FAST"]
 ignore = ["E501"]
 
+[tool.setuptools]
+packages = ["geollm"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
+
+[dependency-groups]
+dev = [
+    "fastapi>=0.129.0",
+    "python-dotenv>=1.2.1",
+    "uvicorn>=0.40.0",
+]

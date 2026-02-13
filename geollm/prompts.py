@@ -51,6 +51,22 @@ Location Type and Confidence:
 - Medium type_confidence (0.6-0.8): Type inferred from context
 - Low type_confidence (<0.6): Type is ambiguous or guessed
 
+Type Hierarchy and Fuzzy Matching:
+- Types are organized in a hierarchy supporting fuzzy matching:
+   * Concrete types: "lake", "river", "city", "mountain", "train_station", etc.
+   * Categories: "water" (matches lake, river, pond, etc.), "settlement" (matches city, town, village, etc.)
+- When inferring type, prefer concrete types over categories for specificity
+- Examples of type categories:
+   * water → [lake, river, pond, spring, waterfall, glacier, dam, etc.]
+   * settlement → [city, town, village, hamlet, district]
+   * administrative → [country, canton, municipality, region]
+   * landforms → [mountain, peak, hill, pass, valley, ridge]
+   * transport → [train_station, bus_stop, airport, road, bridge, etc.]
+   * building → [building, religious_building, tower, monument]
+- The datasource may return any type from its category and apply fuzzy matching
+
+{available_types_info}
+
 Location Name Extraction:
 - Extract the location name as mentioned in the query (preserve the original form)
 - Examples: "Lausanne" → name="Lausanne", "Lake Geneva" → name="Lake Geneva", "Bern" → name="Bern"
@@ -105,13 +121,19 @@ Query: {query}
 Return a structured JSON response following the GeoQuery schema."""
 
 
-def build_prompt_template(spatial_config: SpatialRelationConfig, include_examples: bool = True) -> ChatPromptTemplate:
+def build_prompt_template(
+    spatial_config: SpatialRelationConfig,
+    include_examples: bool = True,
+    available_types: list[str] | None = None,
+) -> ChatPromptTemplate:
     """
     Build complete prompt template with system message, examples, and user message.
 
     Args:
         spatial_config: Spatial relation configuration for injecting available relations
         include_examples: Whether to include few-shot examples (default: True)
+        available_types: Concrete types available in the datasource (e.g., ["lake", "river", "city"]).
+                        If provided, will be included in the prompt to help the LLM choose appropriate types.
 
     Returns:
         ChatPromptTemplate ready for formatting
@@ -120,7 +142,20 @@ def build_prompt_template(spatial_config: SpatialRelationConfig, include_example
 
     # System message with spatial relations - inject the spatial_relations here
     spatial_relations_text = format_spatial_relations(spatial_config)
-    system_prompt = SYSTEM_PROMPT.format(spatial_relations=spatial_relations_text)
+
+    # Format available types info if provided
+    available_types_info = ""
+    if available_types:
+        available_types_info = f"""
+Available Concrete Types in This Datasource:
+The following {len(available_types)} concrete types are available in the datasource:
+{", ".join(sorted(available_types))}
+
+When inferring type, prefer these concrete types for better matching."""
+
+    system_prompt = SYSTEM_PROMPT.format(
+        spatial_relations=spatial_relations_text, available_types_info=available_types_info
+    )
     # Escape braces for ChatPromptTemplate
     system_prompt = system_prompt.replace("{", "{{").replace("}", "}}")
     messages.append(("system", system_prompt))

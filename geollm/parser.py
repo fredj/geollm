@@ -2,7 +2,7 @@
 Main parser class for natural language geographic query parsing.
 """
 
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 from langchain_core.language_models import BaseChatModel
 from langchain_core.prompts import ChatPromptTemplate
@@ -12,6 +12,9 @@ from .models import GeoQuery
 from .prompts import build_prompt_template
 from .spatial_config import SpatialRelationConfig
 from .validators import validate_query
+
+if TYPE_CHECKING:
+    from .datasources.protocol import GeoDataSource
 
 
 class GeoFilterParser:
@@ -46,6 +49,7 @@ class GeoFilterParser:
         confidence_threshold: float = 0.6,
         strict_mode: bool = False,
         include_examples: bool = True,
+        datasource: "GeoDataSource | None" = None,
     ):
         """
         Initialize the parser.
@@ -56,11 +60,15 @@ class GeoFilterParser:
             confidence_threshold: Minimum confidence to accept (0-1)
             strict_mode: If True, raise error on low confidence. If False, warn only
             include_examples: Whether to include few-shot examples in prompt
+            datasource: Optional GeoDataSource instance. If provided, the LLM will be informed
+                       about the concrete types available in that datasource for better type inference.
 
         Example:
             >>> from langchain.chat_models import init_chat_model
+            >>> from geollm.datasources.swissnames3d import SwissNames3DSource
             >>> llm = init_chat_model(model="gpt-4o", model_provider="openai", temperature=0)
-            >>> parser = GeoFilterParser(llm=llm)
+            >>> datasource = SwissNames3DSource("data/")
+            >>> parser = GeoFilterParser(llm=llm, datasource=datasource)
         """
         self.llm = llm
 
@@ -71,6 +79,7 @@ class GeoFilterParser:
         self.confidence_threshold = confidence_threshold
         self.strict_mode = strict_mode
         self.include_examples = include_examples
+        self.datasource = datasource
 
         # Build structured LLM
         self.structured_llm = self._build_structured_llm()
@@ -88,9 +97,16 @@ class GeoFilterParser:
         )
 
     def _build_prompt(self) -> ChatPromptTemplate:
-        """Build prompt template with spatial relations and examples."""
+        """Build prompt template with spatial relations, examples, and available types."""
+        available_types = None
+        if self.datasource is not None:
+            available_types = self.datasource.get_available_types()
 
-        return build_prompt_template(spatial_config=self.spatial_config, include_examples=self.include_examples)
+        return build_prompt_template(
+            spatial_config=self.spatial_config,
+            include_examples=self.include_examples,
+            available_types=available_types,
+        )
 
     def parse(self, query: str) -> GeoQuery:
         """

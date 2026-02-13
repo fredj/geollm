@@ -4,6 +4,7 @@ Interactive REPL for GeoLLM query parsing.
 
 import os
 
+from dotenv import load_dotenv
 from langchain.chat_models import init_chat_model
 
 from geollm import GeoFilterParser
@@ -46,6 +47,9 @@ def print_result(result):
 
 def main():
     """Run the interactive REPL."""
+    # Load environment variables
+    load_dotenv()
+
     # Get API key from environment
     api_key = os.environ.get("OPENAI_API_KEY")
     if not api_key:

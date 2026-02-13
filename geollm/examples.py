@@ -162,7 +162,7 @@ EXAMPLES: list[ExampleQuery] = [
                 name="Zurich",
                 type="city",
             ),
-            buffer_config=None,
+            buffer_config=BufferConfig(distance_m=10000, buffer_from="center", ring_only=False, inferred=True),
             confidence_breakdown=ConfidenceScore(
                 overall=0.94,
                 location_confidence=0.95,
@@ -228,7 +228,7 @@ EXAMPLES: list[ExampleQuery] = [
                 name="Lausanne",
                 type="city",
             ),
-            buffer_config=None,
+            buffer_config=BufferConfig(distance_m=10000, buffer_from="center", ring_only=False, inferred=True),
             confidence_breakdown=ConfidenceScore(
                 overall=0.95,
                 location_confidence=0.95,

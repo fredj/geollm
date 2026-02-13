@@ -202,3 +202,39 @@ def test_validate_query_complete_pipeline(spatial_config):
     # Should be enriched with defaults
     assert validated.buffer_config is not None
     assert validated.buffer_config.distance_m == 5000
+
+
+def test_enrich_directional_defaults(spatial_config):
+    """Test that directional relations auto-generate buffer_config with 10km defaults."""
+    query = GeoQuery(
+        query_type="simple",
+        spatial_relation=SpatialRelation(
+            relation="north_of",
+            category="directional",
+        ),
+        reference_location=ReferenceLocation(
+            name="Bern",
+            type="city",
+        ),
+        buffer_config=BufferConfig(
+            distance_m=0,  # Placeholder, will be enriched
+            buffer_from="center",
+            ring_only=False,
+            inferred=True,
+        ),
+        confidence_breakdown=ConfidenceScore(
+            overall=0.85,
+            location_confidence=0.85,
+            relation_confidence=0.85,
+        ),
+        original_query="north of Bern",
+    )
+
+    enriched = enrich_with_defaults(query, spatial_config)
+
+    # Verify buffer_config was enriched with directional defaults
+    assert enriched.buffer_config is not None
+    assert enriched.buffer_config.distance_m == 10000  # 10km default for directional
+    assert enriched.buffer_config.buffer_from == "center"
+    assert enriched.buffer_config.ring_only is False
+    assert enriched.buffer_config.inferred is True

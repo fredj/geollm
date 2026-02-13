@@ -1,4 +1,4 @@
-.PHONY: help install test lint format clean repl
+.PHONY: help install test lint format clean repl demo
 
 help:
 	@echo "GeoLLM - UV Commands"
@@ -6,6 +6,7 @@ help:
 	@echo "Setup:"
 	@echo "  make install    Install dependencies"
 	@echo "  make dev        Install with dev dependencies"
+	@echo "  make download-data Download SwissNames3D dataset"
 	@echo ""
 	@echo "Testing:"
 	@echo "  make test       Run tests"
@@ -18,6 +19,8 @@ help:
 	@echo ""
 	@echo "Running:"
 	@echo "  make repl       Run interactive REPL"
+	@echo "  make demo       Run the demo app"
+
 	@echo ""
 	@echo "Maintenance:"
 	@echo "  make clean      Clean build artifacts"
@@ -27,6 +30,8 @@ install:
 
 dev:
 	uv sync --extra dev
+
+DATA_PKT = data/swissNAMES3D_PLY.shp
 
 test:
 	uv run pytest tests/ -v
@@ -45,6 +50,17 @@ check:
 
 repl:
 	uv run python repl.py
+
+demo:
+	uv run uvicorn demo.main:app --port 8000 --reload
+
+download-data: $(DATA_PKT)
+
+$(DATA_PKT):
+	mkdir -p data
+	curl -L https://data.geo.admin.ch/ch.swisstopo.swissnames3d/swissnames3d_2025/swissnames3d_2025_2056.shp.zip -o data/swissnames3d.zip
+	unzip -o data/swissnames3d.zip -d data/
+	rm data/swissnames3d.zip
 
 clean:
 	rm -rf .pytest_cache htmlcov .coverage

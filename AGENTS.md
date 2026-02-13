@@ -2,6 +2,14 @@
 
 This file contains important information for AI agents working in this codebase.
 
+## Architecture
+
+See [ARCHITECTURE.md](./ARCHITECTURE.md) for detailed documentation on:
+- Spatial relations processing pipeline
+- Component overview (Parser, DataSource, Spatial Operations)
+- Data models and type system
+- Project structure
+
 ## Local Development
 
 ### Code checks
@@ -43,3 +51,5 @@ python -m pytest tests/test_models.py::test_reference_location -v
 - Use `python -m pytest` instead of just `pytest` to ensure the correct Python environment is used
 - Some tests may be skipped if environment variables (e.g., `OPENAI_API_KEY`) are not set
 - All tests should pass before considering work complete
+
+

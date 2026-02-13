@@ -6,6 +6,8 @@ Parse location queries into structured geographic queries using LLM.
 
 # Main API
 # Exceptions
+# Datasources
+from .datasources import GeoDataSource, SwissNames3DSource
 from .exceptions import (
     GeoFilterError,
     LowConfidenceError,
@@ -25,6 +27,9 @@ from .models import (
     SpatialRelation,
 )
 from .parser import GeoFilterParser
+
+# Spatial operations
+from .spatial import apply_spatial_relation
 
 # Configuration
 from .spatial_config import RelationConfig, SpatialRelationConfig
@@ -49,4 +54,9 @@ __all__ = [
     "UnknownRelationError",
     "LowConfidenceError",
     "LowConfidenceWarning",
+    # Datasources
+    "GeoDataSource",
+    "SwissNames3DSource",
+    # Spatial
+    "apply_spatial_relation",
 ]

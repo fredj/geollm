@@ -119,7 +119,10 @@ class GeoQuery(BaseModel):
     reference_location: ReferenceLocation = Field(description="Reference location for the spatial query")
     buffer_config: BufferConfig | None = Field(
         None,
-        description="Buffer configuration. Required for buffer relations, null for others.",
+        description="Buffer configuration for buffer and directional relations. "
+        "Auto-generated with defaults by enrich_with_defaults() if not provided. "
+        "Required for 'near', 'around', 'north_of', etc. "
+        "Set to None for containment relations ('in').",
     )
     confidence_breakdown: ConfidenceScore = Field(description="Confidence scores for different aspects of the parse")
     original_query: str = Field(description="Original query text exactly as provided by the user")
@@ -127,12 +130,14 @@ class GeoQuery(BaseModel):
     @model_validator(mode="after")
     def validate_buffer_config_consistency(self) -> "GeoQuery":
         """Validate buffer_config consistency with relation category."""
-        # Buffer relations must have buffer_config
-        if self.spatial_relation.category == "buffer" and self.buffer_config is None:
-            raise ValueError(f"Buffer relation '{self.spatial_relation.relation}' requires buffer_config")
+        # Buffer and directional relations must have buffer_config
+        if self.spatial_relation.category in ("buffer", "directional") and self.buffer_config is None:
+            raise ValueError(
+                f"{self.spatial_relation.category} relation '{self.spatial_relation.relation}' requires buffer_config"
+            )
 
-        # Non-buffer relations should not have buffer_config
-        if self.spatial_relation.category != "buffer" and self.buffer_config is not None:
+        # Containment relations should not have buffer_config
+        if self.spatial_relation.category == "containment" and self.buffer_config is not None:
             raise ValueError(
                 f"{self.spatial_relation.category} relation '{self.spatial_relation.relation}' "
                 f"should not have buffer_config"

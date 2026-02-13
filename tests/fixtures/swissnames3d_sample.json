@@ -1,0 +1,92 @@
+{
+  "type": "FeatureCollection",
+  "crs": {
+    "type": "name",
+    "properties": { "name": "urn:ogc:def:crs:EPSG::2056" }
+  },
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "UUID": "uuid-bern-city",
+        "NAME": "Bern",
+        "OBJEKTART": "Ort",
+        "KANTON": "BE",
+        "EINWOHNER": 134000
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [2600000.0, 1199000.0]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "UUID": "uuid-bern-canton",
+        "NAME": "Bern",
+        "OBJEKTART": "Kanton",
+        "FLAECHE": 5959
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [2550000.0, 1150000.0],
+            [2650000.0, 1150000.0],
+            [2650000.0, 1250000.0],
+            [2550000.0, 1150000.0]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "UUID": "uuid-lake-geneva",
+        "NAME": "Lac Léman",
+        "OBJEKTART": "See",
+        "HOEHE": 372
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [2500000.0, 1110000.0],
+            [2580000.0, 1130000.0],
+            [2520000.0, 1150000.0],
+            [2500000.0, 1110000.0]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "UUID": "uuid-rhone",
+        "NAME": "Rhône",
+        "OBJEKTART": "Fliessgewaesser"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [2600000.0, 1100000.0],
+          [2500000.0, 1110000.0],
+          [2400000.0, 1090000.0]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "UUID": "uuid-zurich",
+        "NAME": "Zürich",
+        "OBJEKTART": "Ort",
+        "EINWOHNER": 400000
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [2683000.0, 1247000.0]
+      }
+    }
+  ]
+}
