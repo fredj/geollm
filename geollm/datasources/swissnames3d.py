@@ -347,11 +347,13 @@ class SwissNames3DSource:
 
         Args:
             name: Location name to search for.
-            type: Optional type hint for ranking results.
+            type: Optional type hint to filter results. If provided, only features
+                  of this type are returned.
             max_results: Maximum number of results to return.
 
         Returns:
-            List of matching GeoJSON Feature dicts, ranked by relevance.
+            List of matching GeoJSON Feature dicts. If type is provided, only
+            features of that type are returned. Empty list if no matches found.
         """
         self._ensure_loaded()
 
@@ -364,10 +366,10 @@ class SwissNames3DSource:
 
         features = [self._row_to_feature(idx) for idx in indices]
 
-        # Rank by type match if type hint provided
+        # Filter by type if type hint provided
         if type is not None:
             normalized_type = type.lower()
-            features.sort(key=lambda f: f["properties"].get("type") != normalized_type)
+            features = [f for f in features if f["properties"].get("type") == normalized_type]
 
         return features[:max_results]
 

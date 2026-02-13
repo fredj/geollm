@@ -76,14 +76,15 @@ def test_search_accent_normalization(source):
 
 
 def test_search_with_type_filter(source):
-    """Test using type hint for ranking."""
+    """Test using type hint to filter results."""
     # "Bern" matches city (Ort) and unknown type (Kanton is unmapped)
-    # Only test with type="city" since "canton" type is no longer available
+    # With type filter, only city results are returned
 
-    # Prefer city
+    # Filter to city only
     results_city = source.search("Bern", type="city")
+    assert len(results_city) == 1
     assert results_city[0]["properties"]["type"] == "city"
-    # Second result will have unmapped OBJEKTART type "kanton"
+    assert results_city[0]["properties"]["name"] == "Bern"
 
 
 def test_coordinate_conversion(source):

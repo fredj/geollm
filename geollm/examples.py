@@ -352,6 +352,52 @@ EXAMPLES: list[ExampleQuery] = [
             original_query="15 minutes bike from Lake Geneva",
         ),
     ),
+    # Example 15: French proximity with location type (French)
+    ExampleQuery(
+        input="près de la gare d'Yverdon",
+        language="fr",
+        description="French proximity query - 'près de' maps to 'near', full official location name used for correct geodata lookup",
+        output=GeoQuery(
+            query_type="simple",
+            spatial_relation=SpatialRelation(relation="near", category="buffer", explicit_distance=None),
+            reference_location=ReferenceLocation(
+                name="Yverdon-les-Bains",
+                type="train_station",
+                type_confidence=0.85,
+            ),
+            buffer_config=BufferConfig(distance_m=5000, buffer_from="center", ring_only=False, inferred=True),
+            confidence_breakdown=ConfidenceScore(
+                overall=0.88,
+                location_confidence=0.85,
+                relation_confidence=0.90,
+                reasoning="'Près de la gare d'Yverdon' - extracted full official name 'Yverdon-les-Bains' to match SwissNames3D data with train_station type",
+            ),
+            original_query="près de la gare d'Yverdon",
+        ),
+    ),
+    # Example 16: Explicit distance from location with type descriptor (English)
+    ExampleQuery(
+        input="500m from the Lausanne railway station",
+        language="en",
+        description="Explicit distance from a specific location type - 'from' maps to 'near', base location name extracted from descriptor",
+        output=GeoQuery(
+            query_type="simple",
+            spatial_relation=SpatialRelation(relation="near", category="buffer", explicit_distance=500),
+            reference_location=ReferenceLocation(
+                name="Lausanne",
+                type="railway_station",
+                type_confidence=0.90,
+            ),
+            buffer_config=BufferConfig(distance_m=500, buffer_from="center", ring_only=False, inferred=False),
+            confidence_breakdown=ConfidenceScore(
+                overall=0.92,
+                location_confidence=0.90,
+                relation_confidence=0.95,
+                reasoning="'500m from the Lausanne railway station' - explicit 500m distance, location type inferred from 'railway station', base location 'Lausanne' extracted",
+            ),
+            original_query="500m from the Lausanne railway station",
+        ),
+    ),
 ]
 
 

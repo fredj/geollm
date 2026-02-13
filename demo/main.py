@@ -31,7 +31,7 @@ llm = ChatOpenAI(model="gpt-4o", temperature=0)
 parser = GeoFilterParser(llm)
 
 # Data source configuration
-SWISSNAMES3D_PATH = os.getenv("SWISSNAMES3D_PATH", "data/swissNAMES3D_PLY.shp")
+SWISSNAMES3D_PATH = os.getenv("SWISSNAMES3D_PATH", "data")
 
 if not os.path.exists(SWISSNAMES3D_PATH):
     raise RuntimeError(

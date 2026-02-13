@@ -33,8 +33,14 @@ Spatial Relations:
 - Use cardinal directions (N/S/E/W) for directional queries
 - Distinguish between:
   * Containment: exact boundary matching (in)
-  * Buffer: proximity or erosion (near, around, on_shores_of, in_the_heart_of)
+  * Buffer: proximity or erosion (near, around, on_shores_of, in_the_heart_of, deep_inside)
   * Directional: sector-based (north_of, south_of, east_of, west_of)
+- Common prepositions mapping to the 'near' relation:
+  * "near X" → relation="near"
+  * "around X" → relation="around"
+  * "from X" → relation="near" (proximity/distance from a location)
+  * "away from X" → relation="near" (distance from a location)
+  * All proximity prepositions express distance to a location with optional explicit distance
 
 Location Type and Confidence:
 - type is OPTIONAL and should be used as a HINT, not a strict requirement
@@ -70,6 +76,10 @@ Type Hierarchy and Fuzzy Matching:
 Location Name Extraction:
 - Extract the location name as mentioned in the query (preserve the original form)
 - Examples: "Lausanne" → name="Lausanne", "Lake Geneva" → name="Lake Geneva", "Bern" → name="Bern"
+- For descriptive modifiers, extract the base location name:
+  * "the center of Lausanne" → name="Lausanne"
+  * "the outskirts of Geneva" → name="Geneva"
+  * "downtown Bern" → name="Bern"
 - Do NOT normalize, translate, or create canonical forms - the geodata layer handles that
 - Preserve the language and spelling used in the query
 
