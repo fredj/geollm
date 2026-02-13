@@ -219,3 +219,29 @@ def test_fuzzy_search_with_type_filter(real_source):
     # River results should only contain rivers
     for result in river_results:
         assert result["properties"]["type"] == "river", f"Expected type 'river', got {result['properties']['type']}"
+
+
+def test_multiple_disconnected_segments(real_source):
+    """Test searching for entities with disconnected segments (e.g., river split by lake).
+
+    La Venoge is split into two segments by a lake. This test verifies that:
+    1. Both segments are returned when searching
+    2. Each segment is independent (not connected)
+    3. Segments have different geometry properties (different coordinate counts)
+    """
+    results = real_source.search("Venoge", type="river")
+
+    # Should find multiple river segments with the same name
+    assert len(results) >= 2, f"Expected at least 2 segments for La Venoge, got {len(results)}"
+
+    # All results should be LineStrings
+    for result in results:
+        assert result["geometry"]["type"] == "LineString", f"Expected LineString, got {result['geometry']['type']}"
+
+    # Check that segments have different coordinate counts (indicating they're different parts)
+    coord_counts = [len(r["geometry"]["coordinates"]) for r in results]
+    assert len(set(coord_counts)) > 1, "Expected segments to have different sizes, but they're identical"
+
+    # All should have the same name
+    names = {r["properties"]["name"] for r in results}
+    assert len(names) == 1, f"Expected all segments to have same name, got {names}"

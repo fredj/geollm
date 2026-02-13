@@ -59,6 +59,36 @@ export OPENAI_API_KEY='sk-...'
 uv run python repl.py
 ```
 
+## Demo API Server
+
+A FastAPI demo server is available that combines query parsing with geographic resolution using SwissNames3D data.
+
+**Setup:**
+
+Set `OPENAI_API_KEY` in your `.env` file:
+
+```bash
+echo "OPENAI_API_KEY=sk-..." > .env
+```
+
+**Running the server:**
+
+```bash
+uv run fastapi dev demo/main.py
+```
+
+The API will be available at `http://localhost:8000`.
+
+**Making a query:**
+
+```bash
+curl -X POST http://localhost:8000/api/query \
+  -H "Content-Type: application/json" \
+  -d '{"query": "north of Lausanne"}'
+```
+
+Response: A GeoJSON FeatureCollection containing the parsed geographic query, spatial relation, and computed search areas.
+
 ## Quick Start
 
 ```python
