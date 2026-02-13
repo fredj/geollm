@@ -158,6 +158,8 @@
 
           const data = await response.json();
 
+          console.log(data.geo_query);
+
           // Add features to map
           const format = new ol.format.GeoJSON({
             dataProjection: "EPSG:4326",

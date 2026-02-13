@@ -35,20 +35,22 @@ Spatial Relations:
   * Containment: exact boundary matching (in)
   * Buffer: proximity or erosion (near, around, on_shores_of, in_the_heart_of, deep_inside)
   * Directional: sector-based (north_of, south_of, east_of, west_of)
+- Common prepositions mapping to the 'in' relation:
+   * "in X" → relation="in" (containment/boundary)
+   * "on X" → relation="in" (surface containment, e.g., "on the mountain", "on the island")
 - Common prepositions mapping to the 'near' relation:
-  * "near X" → relation="near"
-  * "around X" → relation="around"
-  * "from X" → relation="near" (proximity/distance from a location)
-  * "away from X" → relation="near" (distance from a location)
-  * All proximity prepositions express distance to a location with optional explicit distance
+   * "near X" → relation="near"
+   * "around X" → relation="around"
+   * "from X" → relation="near" (proximity/distance from a location)
+   * "away from X" → relation="near" (distance from a location)
+   * All proximity prepositions express distance to a location with optional explicit distance
 
 Location Type and Confidence:
 - type is OPTIONAL and should be used as a HINT, not a strict requirement
 - Set type when explicitly mentioned or strongly implied: "Lake Geneva" → type="lake", type_confidence=0.95
 - For ambiguous cases, set low confidence or omit type entirely:
   * "Bern" could be city OR canton → type="city", type_confidence=0.5
-  * "Rhone" could be river OR road → type="river", type_confidence=0.6
-  * "Montreux" (unclear) → type=None, type_confidence=None
+  * "Orbe" could be city OR river → type="city", type_confidence=0.5
 - Use spatial relation as a hint for type:
   * "along X" suggests linear features (river, road, path) → moderate confidence
   * "in X" suggests areas (city, region, country) → moderate confidence
