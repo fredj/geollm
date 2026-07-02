@@ -159,8 +159,8 @@ class QueryResponse(BaseModel):
     result: dict[str, Any]  # GeoJSON FeatureCollection
 
 
-@app.post("/api/query", response_model=QueryResponse)
-async def process_query(request: QueryRequest):
+@app.post("/api/query")
+async def process_query(request: QueryRequest) -> QueryResponse:
     try:
         return await _run_geo_query(request.query)
     except ValueError as e:
