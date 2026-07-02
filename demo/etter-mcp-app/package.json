@@ -6,7 +6,7 @@
     "serve": "npx tsx server.ts"
   },
   "dependencies": {
-    "@modelcontextprotocol/ext-apps": "^1.1.1",
+    "@modelcontextprotocol/ext-apps": "^1.7.4",
     "@modelcontextprotocol/sdk": "^1.27.0",
     "ol": "^10.8.0"
   },
