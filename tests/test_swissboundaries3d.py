@@ -21,9 +21,9 @@ def source():
     return SwissBoundaries3DSource(FIXTURE_PATH)
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def real_source():
-    """Create a SwissBoundaries3DSource instance using real shapefiles."""
+    """Create a SwissBoundaries3DSource instance using real shapefiles (loaded once per module — tests must not mutate it)."""
     if not DATA_DIR.exists():
         pytest.skip("Real SwissBoundaries3D data directory not found")
     # Check for at least one of the expected shapefiles

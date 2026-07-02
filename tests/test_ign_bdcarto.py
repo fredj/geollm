@@ -18,9 +18,9 @@ def source():
     return IGNBDCartoSource(FIXTURE_PATH)
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def real_source():
-    """IGNBDCartoSource loaded from real BD-CARTO GeoPackage files."""
+    """IGNBDCartoSource loaded from real BD-CARTO GeoPackage files (loaded once per module — tests must not mutate it)."""
     if not DATA_DIR.exists():
         pytest.skip("Real BD-CARTO data directory not found")
     return IGNBDCartoSource(DATA_DIR)
