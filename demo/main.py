@@ -147,7 +147,7 @@ async def _run_geo_query(query: str) -> "QueryResponse":
         raise ValueError(f"Location '{location_name}' not found")
     result_features = _build_result_features(geo_query, features)
     feature_collection = {"type": "FeatureCollection", "features": result_features}
-    return QueryResponse(query=query, geo_query=geo_query.model_dump(), result=feature_collection)
+    return QueryResponse(query=query, geo_query=geo_query, result=feature_collection)
 
 
 class QueryRequest(BaseModel):
@@ -156,7 +156,7 @@ class QueryRequest(BaseModel):
 
 class QueryResponse(BaseModel):
     query: str
-    geo_query: dict[str, Any]  # The parsed GeoQuery
+    geo_query: GeoQuery
     result: dict[str, Any]  # GeoJSON FeatureCollection
 
 
