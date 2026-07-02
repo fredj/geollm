@@ -1,0 +1,64 @@
+name: Docs check
+
+on:
+  workflow_dispatch:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.filter.outputs.changed }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dorny/paths-filter@v4
+        id: filter
+        with:
+          filters: |
+            changed:
+              - etter/**
+              - docs/**
+              - pyproject.toml
+              - uv.lock
+              - .github/workflows/docs-check.yml
+
+  build-check:
+    needs:
+      - changes
+    if: ${{ needs.changes.outputs.changed == 'true' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version-file: .python-version
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Install Python dependencies
+        run: uv sync --extra dev
+
+      - name: Generate API docs with pdoc
+        run: uv run pdoc etter --docformat google -t docs/pdoc-templates -o docs/public/api/
+
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: docs/package-lock.json
+
+      - name: Install Node dependencies
+        run: npm ci
+        working-directory: docs
+
+      - name: Build VitePress site
+        run: npm run build
+        working-directory: docs
