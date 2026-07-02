@@ -57,6 +57,15 @@ jobs:
       - name: Run tests
         run: uv run pytest tests/ -v
 
+      - name: Build distributions
+        run: uv build
+
+      - name: Smoke test (wheel)
+        run: uv run --isolated --no-project --with dist/*.whl tests/smoke_check.py
+
+      - name: Smoke test (sdist)
+        run: uv run --isolated --no-project --with dist/*.tar.gz tests/smoke_check.py
+
   alls-green: # This job does nothing and is only used for the branch protection
     if: always()
     needs:
