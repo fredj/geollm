@@ -17,13 +17,14 @@ classifiers     = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
     "Topic :: Scientific/Engineering :: GIS",
 ]
 dependencies = [
     "langchain>=1.2",
     "pydantic>=2.12",
-    "shapely>=2.1",
+    "shapely>=2.1.2",
     "pyproj>=3.7",
     "geopandas>=1.1",
     "rapidfuzz>=3.14",

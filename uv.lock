@@ -513,7 +513,7 @@ requires-dist = [
     { name = "rapidfuzz", specifier = ">=3.14" },
     { name = "rich", marker = "extra == 'dev'", specifier = ">=15.0.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.15" },
-    { name = "shapely", specifier = ">=2.1" },
+    { name = "shapely", specifier = ">=2.1.2" },
     { name = "sqlalchemy", marker = "extra == 'postgis'", specifier = ">=2.0" },
     { name = "testcontainers", extras = ["postgres"], marker = "extra == 'dev'", specifier = ">=4.14.2" },
     { name = "trio", marker = "extra == 'dev'", specifier = ">=0.28" },
