@@ -62,9 +62,10 @@ def db_engine(postgis_container):
     url = postgis_container.get_connection_url()
     engine = create_engine(url)
 
-    # Enable PostGIS extension
+    # Enable PostGIS and pg_trgm extensions
     with engine.connect() as conn:
         conn.execute(text("CREATE EXTENSION IF NOT EXISTS postgis"))
+        conn.execute(text("CREATE EXTENSION IF NOT EXISTS pg_trgm"))
         conn.commit()
 
     yield engine
@@ -146,6 +147,32 @@ def source(db_engine, populated_table):  # noqa: ARG001
         geometry_column="geom",
         id_column="id",
     )
+
+
+@pytest.fixture(scope="module")
+def fuzzy_source(db_engine, populated_table):  # noqa: ARG001
+    """Same table, but with a low fuzzy threshold to make fuzzy-only matches robust to test."""
+    return PostGISDataSource(
+        connection=db_engine,
+        table=TABLE_NAME,
+        name_column="name",
+        type_column="type",
+        geometry_column="geom",
+        id_column="id",
+        fuzzy_threshold=0.5,
+    )
+
+
+def test_search_fuzzy_typo_multiword_name(fuzzy_source):
+    """A typo'd query that isn't a substring of the name still matches via pg_trgm fuzzy search.
+
+    Regression test for word_similarity(a, b) argument order: it is not
+    symmetric, and treating the (short) query as the "word" searched for
+    within the (potentially multi-word) name is required for this to match.
+    """
+    results = fuzzy_source.search("Venoje")  # typo of "Venoge", not a substring of "La Venoge"
+    assert len(results) >= 1
+    assert any("Venoge" in r["properties"]["name"] for r in results)
 
 
 def test_search_exact(source):

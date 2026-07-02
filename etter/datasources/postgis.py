@@ -125,6 +125,13 @@ class PostGISDataSource:
         fuzzy_threshold: Minimum ``pg_trgm`` similarity score (0-1) used for
             fuzzy fallback search when no exact ``ILIKE`` match is found.
 
+    .. note::
+        The fuzzy fallback scans every row (``word_similarity()`` is not
+        indexable via a plain B-tree). For large tables, add a trigram index
+        on the name column to speed it up::
+
+            CREATE INDEX ON <table> USING gist (name gist_trgm_ops);
+
     Example: unmodified SwissNames3D table::
 
         from sqlalchemy import create_engine
@@ -349,11 +356,11 @@ class PostGISDataSource:
         name_expr = f"lower({self._name_col})"
         if self._check_unaccent(conn):
             name_expr = f"unaccent({name_expr})"
-        sql = sa.text(
-            f"SELECT {cols} FROM {self._table} "  # noqa: S608
-            f"WHERE {name_expr} = :query{type_clause} "
-            f"LIMIT :limit"
-        )
+        sql = sa.text(f"""
+            SELECT {cols} FROM {self._table}
+            WHERE {name_expr} = :query{type_clause}
+            LIMIT :limit
+        """)  # noqa: S608
         params: dict[str, Any] = {
             "query": _normalize_name(name),
             "limit": fetch_limit,
@@ -390,11 +397,11 @@ class PostGISDataSource:
         else:
             name_expr = self._name_col
             pattern = f"%{name}%"
-        sql = sa.text(
-            f"SELECT {cols} FROM {self._table} "  # noqa: S608
-            f"WHERE {name_expr} ILIKE :pattern{type_clause} "
-            f"LIMIT :limit"
-        )
+        sql = sa.text(f"""
+            SELECT {cols} FROM {self._table}
+            WHERE {name_expr} ILIKE :pattern{type_clause}
+            LIMIT :limit
+        """)  # noqa: S608
         params: dict[str, Any] = {"pattern": pattern, "limit": fetch_limit, **type_params}
         try:
             result = conn.execute(sql, params)
@@ -428,12 +435,18 @@ class PostGISDataSource:
             )
             name_expr = f"lower({self._name_col})"
         type_clause, type_params = self._type_filter_sql(type_filter)
-        sql = sa.text(
-            f"SELECT {cols} FROM {self._table} "  # noqa: S608
-            f"WHERE word_similarity({name_expr}, :query) > :threshold{type_clause} "
-            f"ORDER BY word_similarity({name_expr}, :query) DESC "
-            f"LIMIT :limit"
-        )
+        # Compute word_similarity() once in the subquery and reuse it via the
+        # "sim" alias, rather than evaluating it separately for the WHERE
+        # filter and the ORDER BY sort.
+        sql = sa.text(f"""
+            SELECT id, name, type, geojson FROM (
+                SELECT {cols}, word_similarity(:query, {name_expr}) AS sim
+                FROM {self._table} WHERE TRUE{type_clause}
+            ) AS scored
+            WHERE sim > :threshold
+            ORDER BY sim DESC
+            LIMIT :limit
+        """)  # noqa: S608
         params: dict[str, Any] = {
             "query": normalized_query,
             "threshold": self._fuzzy_threshold,
