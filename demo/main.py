@@ -10,7 +10,6 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.sse import EventSourceResponse
-from fastapi.staticfiles import StaticFiles
 from langchain.chat_models import init_chat_model
 from mcp.server.fastmcp import FastMCP
 from mcp.server.fastmcp.exceptions import ToolError
@@ -270,5 +269,5 @@ async def parse_geo_query(user_query: str) -> dict[str, Any]:
 geo_mcp.settings.streamable_http_path = "/"
 app.mount("/mcp", geo_mcp.streamable_http_app())
 
-# Mount static files (must be last)
-app.mount("/", StaticFiles(directory="demo/static", html=True), name="static")
+# Serve the frontend (low-priority route, matched after API routes)
+app.frontend("/", directory="demo/static")
