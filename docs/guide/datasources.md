@@ -1,6 +1,6 @@
 # Datasources
 
-A datasource resolves a location name (e.g. `"Lausanne"`) to a geometry. etter ships with three implementations and a composable aggregator.
+A datasource resolves a location name (e.g. `"Lausanne"`) to a geometry. etter ships with four implementations and a composable aggregator.
 
 All datasources implement the [`GeoDataSource`](../api/etter.html#GeoDataSource) protocol — no inheritance required.
 
@@ -111,12 +111,16 @@ All datasources share a common type hierarchy for fuzzy type matching. Query wit
 |----------|--------------------------|
 | `water` | `lake`, `river`, `pond`, `spring`, `glacier` |
 | `landforms` | `mountain`, `peak`, `hill`, `pass`, `valley` |
+| `mountain` | `mountain`, `peak` |
+| `natural` | `cave`, `forest`, `nature_reserve` |
+| `island` | `island`, `peninsula` |
 | `settlement` | `city`, `town`, `village`, `hamlet` |
 | `administrative` | `country`, `canton`, `municipality`, `region` |
 | `transport` | `train_station`, `airport`, `road`, `bridge` |
 | `building` | `building`, `tower`, `monument`, `fountain` |
 | `amenity` | `restaurant`, `hospital`, `school`, `park` |
-| `natural` | `cave`, `forest`, `nature_reserve` |
+| `infrastructure` | `power_plant`, `landfill`, `quarry` |
+| `other` | `viewpoint`, `field_name`, `historical_site` |
 
 ```python
 # Matches lake, river, pond, spring, ...
@@ -163,8 +167,8 @@ class MyDataSource:
         ...
 
     def get_by_id(self, feature_id: str) -> dict | None:
-        # Optional: return a feature by its unique ID
+        # Return a feature by its unique ID
         ...
 ```
 
-See [`GeoDataSource`](../api/etter.html#GeoDataSource) for the full protocol definition. The `get_by_id()` method is optional for custom datasources.
+See [`GeoDataSource`](../api/etter.html#GeoDataSource) for the full protocol definition. `get_by_id()` is part of the protocol and is required if the datasource is used inside a `CompositeDataSource`, which calls it on each underlying source.

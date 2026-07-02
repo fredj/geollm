@@ -109,7 +109,7 @@ Extracts intent from text using an LLM.
 
 Resolves location names to geometries.
 
-- **Interface**: `GeoDataSource` Protocol (returns `list[dict]` - standard GeoJSON)
+- **Interface**: `GeoDataSource` Protocol (`search()`, `get_by_id()`, `get_available_types()`; returns `list[dict]` - standard GeoJSON)
 - **Type System**: Each datasource declares its own list of available types via `get_available_types()`
   - Types are organized in a semantic hierarchy (water, landforms, settlement, etc.)
   - Supports fuzzy matching: query `type="water"` matches lake, river, pond, spring, etc.
@@ -142,7 +142,7 @@ Resolves location names to geometries.
 
 Transforms reference geometries into search areas.
 
-- **Function**: `apply_spatial_relation(geometry, relation, buffer_config, geometry_format="geojson")`
+- **Function**: `apply_spatial_relation(geometry, relation, buffer_config, spatial_config=None, geometry_format="geojson")`
 - **Operations**:
   - **Containment**: Passthrough (exact boundary)
   - **Buffer**: Positive (expand), Negative (erode), Ring (donut)
@@ -271,21 +271,22 @@ etter uses a **datasource-defined type system** with semantic grouping and fuzzy
 
 ### Type Hierarchy
 
-Types are organized into 11 semantic categories to support fuzzy matching:
+Types are organized into 12 semantic categories to support fuzzy matching:
 
 | Category | Examples |
 |----------|----------|
-| **water** | lake, river, pond, spring, waterfall, glacier, dam |
-| **landforms** | mountain, peak, hill, pass, valley, ridge, plain, boulder |
+| **water** | lake, river, pond, spring, waterfall, glacier, ditch, weir, dam |
+| **landforms** | mountain, peak, hill, pass, valley, ridge, plain, rock_head, boulder, massif |
+| **mountain** | mountain, peak |
 | **natural** | cave, forest, nature_reserve, alpine_pasture |
 | **island** | island, peninsula |
-| **administrative** | country, canton, municipality, region, area |
+| **administrative** | country, canton, municipality, region, department, area, border_marker, arrondissement |
 | **settlement** | city, town, village, hamlet, district |
 | **building** | building, religious_building, tower, monument, fountain |
-| **transport** | train_station, bus_stop, airport, road, bridge, railway, ferry, lift |
-| **amenity** | restaurant, hospital, school, parking, park, swimming_pool, zoo, camping |
-| **infrastructure** | power_plant, wastewater_treatment, landfill, quarry |
-| **other** | viewpoint, field_name, local_name, historical_site |
+| **transport** | train_station, bus_stop, boat_stop, road, bridge, tunnel, exit, entrance_exit, junction, railway, railway_area, lift, loading_station, airport, heliport, ferry |
+| **amenity** | restaurant, hospital, school, parking, park, swimming_pool, sports_facility, leisure_facility, zoo, camping, rest_area, standing_area, cemetery, fairground |
+| **infrastructure** | power_plant, wastewater_treatment, waste_incineration, landfill, quarry |
+| **other** | field_name, local_name, viewpoint, private_driving_area, correctional_facility, military_training_area, customs, historical_site, monastery, unknown |
 
 ### How It Works
 
@@ -336,6 +337,9 @@ etter/
 ├── spatial_config.py      # Spatial relation definitions
 ├── prompts.py             # LLM prompts
 ├── validators.py          # Validation pipeline
+├── examples.py            # Few-shot examples for the parser
+├── exceptions.py          # Exception hierarchy
+├── geometry_format.py     # Geometry format conversion (geojson/wkt/wkb)
 ├── datasources/           # Layer 2: Data Resolution
 │   ├── protocol.py        # GeoDataSource Protocol
 │   ├── location_types.py  # Type hierarchy & fuzzy matching

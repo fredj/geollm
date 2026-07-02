@@ -45,11 +45,11 @@ pip install etter[postgis]
 ## Quick Start
 
 ```python
-from langchain_openai import ChatOpenAI
+from langchain.chat_models import init_chat_model
 from etter import GeoFilterParser
 import os
 
-llm = ChatOpenAI(model="gpt-4o", temperature=0, api_key=os.getenv("LLM_API_KEY"))
+llm = init_chat_model(model="gpt-4o", model_provider="openai", temperature=0, api_key=os.getenv("LLM_API_KEY"))
 
 parser = GeoFilterParser(llm=llm)
 result = parser.parse("north of Lausanne")
@@ -104,7 +104,7 @@ See [`parse_stream`](../api/etter.html#GeoFilterParser.parse_stream) for all eve
 
 ## Custom Spatial Relations
 
-Register additional relations beyond the 15 built-ins:
+Register additional relations beyond the 21 built-ins:
 
 ```python
 from etter import SpatialRelationConfig, RelationConfig

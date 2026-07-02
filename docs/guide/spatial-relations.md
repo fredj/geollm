@@ -59,6 +59,19 @@ All directional relations produce a 90° sector wedge extending outward from the
 
 **Example:** `"5km north of Lausanne"` → 90° sector polygon extending 5km north from Lausanne's centroid.
 
+## Area-Based Distance Inference
+
+The "Default distance" values above only apply when `buffer_config.inferred=False` (an explicit distance was set, e.g. from `SpatialRelation.explicit_distance`, "within 5km", "30 min walk"). When `inferred=True` — no explicit distance in the query — `apply_spatial_relation()` computes the geodesic area of the reference geometry (via `pyproj.Geod`) and picks a distance from area-based brackets instead:
+
+| Geometry area | Proximity default | Erosion default |
+|---|---|---|
+| < 1 km² (point, station) | 500 m | −200 m |
+| 1–50 km² (town, small lake) | 1 500 m | −500 m |
+| 50–500 km² (city, medium region) | 5 000 m | −1 000 m |
+| ≥ 500 km² (canton, country) | 15 000 m | −2 000 m |
+
+This means the same relation (e.g. `near`) produces a smaller buffer around a village than around a canton, when the query doesn't state a distance explicitly.
+
 ## Registering Custom Relations
 
 ```python
