@@ -1,16 +1,15 @@
 import asyncio
 import contextlib
-import json
 import logging
 import os
 import time
+from collections.abc import AsyncIterable
 from typing import Any
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
-from fastapi.staticfiles import StaticFiles
+from fastapi.sse import EventSourceResponse
 from langchain.chat_models import init_chat_model
 from mcp.server.fastmcp import FastMCP
 from mcp.server.fastmcp.exceptions import ToolError
@@ -19,6 +18,7 @@ from pydantic import BaseModel
 from etter.datasources import CompositeDataSource, IGNBDCartoSource, PostGISDataSource, SwissNames3DSource
 from etter.datasources.ign_bdcarto import IGN_BDCARTO_TYPE_MAP
 from etter.datasources.swissnames3d import OBJEKTART_TYPE_MAP
+from etter.models import GeoQuery
 from etter.parser import GeoFilterParser
 from etter.spatial import apply_spatial_relation
 
@@ -146,7 +146,7 @@ async def _run_geo_query(query: str) -> "QueryResponse":
         raise ValueError(f"Location '{location_name}' not found")
     result_features = _build_result_features(geo_query, features)
     feature_collection = {"type": "FeatureCollection", "features": result_features}
-    return QueryResponse(query=query, geo_query=geo_query.model_dump(), result=feature_collection)
+    return QueryResponse(query=query, geo_query=geo_query, result=feature_collection)
 
 
 class QueryRequest(BaseModel):
@@ -155,12 +155,12 @@ class QueryRequest(BaseModel):
 
 class QueryResponse(BaseModel):
     query: str
-    geo_query: dict[str, Any]  # The parsed GeoQuery
+    geo_query: GeoQuery
     result: dict[str, Any]  # GeoJSON FeatureCollection
 
 
-@app.post("/api/query", response_model=QueryResponse)
-async def process_query(request: QueryRequest):
+@app.post("/api/query")
+async def process_query(request: QueryRequest) -> QueryResponse:
     try:
         return await _run_geo_query(request.query)
     except ValueError as e:
@@ -170,8 +170,8 @@ async def process_query(request: QueryRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/api/query/stream")
-async def process_query_stream(request: QueryRequest):
+@app.post("/api/query/stream", response_class=EventSourceResponse)
+async def process_query_stream(request: QueryRequest) -> AsyncIterable[dict[str, Any]]:
     """
     Stream processing of a geographic query with real-time reasoning and results.
 
@@ -185,73 +185,68 @@ async def process_query_stream(request: QueryRequest):
              -d '{"query":"restaurants near Lake Geneva"}' \
              --no-buffer
     """
+    try:
+        geo_query_result = None
 
-    async def event_generator():
-        try:
-            geo_query_result = None
+        # Stream parsing events
+        parse_start = time.perf_counter()
+        async for event in parser.parse_stream(request.query):
+            yield event
 
-            # Stream parsing events
-            parse_start = time.perf_counter()
-            async for event in parser.parse_stream(request.query):
-                yield f"data: {json.dumps(event)}\n\n"
+            if event["type"] == "data-response":
+                geo_query_result = event["content"]
+        yield {"type": "reasoning", "content": "LLM parsing", "duration_ms": (time.perf_counter() - parse_start) * 1000}
 
-                if event["type"] == "data-response":
-                    geo_query_result = event["content"]
-            yield f"data: {json.dumps({'type': 'reasoning', 'content': 'LLM parsing', 'duration_ms': (time.perf_counter() - parse_start) * 1000})}\n\n"
+        if geo_query_result:
+            yield {"type": "reasoning", "content": "Resolving location in database"}
 
-            if geo_query_result:
-                yield f"data: {json.dumps({'type': 'reasoning', 'content': 'Resolving location in database'})}\n\n"
+            geo_query = GeoQuery.model_validate(geo_query_result)
 
-                from etter.models import GeoQuery
+            location_name = geo_query.reference_location.name
+            search_start = time.perf_counter()
+            logger.info(f"Searching for location: {location_name} with type hint: {geo_query.reference_location.type}")
+            features = datasource.search(location_name, type=geo_query.reference_location.type)
+            logger.info(
+                f"Found {len(features)} features for location '{location_name}' in {time.perf_counter() - search_start:.2f} seconds"
+            )
+            logger.info(f"Features properties: {[f['properties'] for f in features]}")
 
-                geo_query = GeoQuery.model_validate(geo_query_result)
+            if not features:
+                yield {"type": "reasoning", "content": f"Location not found: {location_name}"}
+                yield {"type": "error", "content": f"Location not found: {location_name}"}
+                return
 
-                location_name = geo_query.reference_location.name
-                search_start = time.perf_counter()
-                logger.info(
-                    f"Searching for location: {location_name} with type hint: {geo_query.reference_location.type}"
-                )
-                features = datasource.search(location_name, type=geo_query.reference_location.type)
-                logger.info(
-                    f"Found {len(features)} features for location '{location_name}' in {time.perf_counter() - search_start:.2f} seconds"
-                )
-                logger.info(f"Features properties: {[f['properties'] for f in features]}")
+            yield {
+                "type": "reasoning",
+                "content": f"Found {len(features)} matching location(s)",
+                "duration_ms": (time.perf_counter() - search_start) * 1000,
+            }
 
-                if not features:
-                    yield f"data: {json.dumps({'type': 'reasoning', 'content': f'Location not found: {location_name}'})}\n\n"
-                    yield f"data: {json.dumps({'type': 'error', 'content': f'Location not found: {location_name}'})}\n\n"
-                    return
+            yield {"type": "reasoning", "content": "Computing spatial search areas"}
 
-                yield f"data: {json.dumps({'type': 'reasoning', 'content': f'Found {len(features)} matching location(s)', 'duration_ms': (time.perf_counter() - search_start) * 1000})}\n\n"
+            spatial_start = time.perf_counter()
+            result_features = _build_result_features(geo_query, features)
+            spatial_duration = (time.perf_counter() - spatial_start) * 1000
+            yield {"type": "reasoning", "content": "Computed spatial relations", "duration_ms": spatial_duration}
 
-                yield f"data: {json.dumps({'type': 'reasoning', 'content': 'Computing spatial search areas'})}\n\n"
+            feature_collection = {
+                "type": "FeatureCollection",
+                "features": result_features,
+            }
 
-                spatial_start = time.perf_counter()
-                result_features = _build_result_features(geo_query, features)
-                spatial_duration = (time.perf_counter() - spatial_start) * 1000
-                yield f"data: {json.dumps({'type': 'reasoning', 'content': 'Computed spatial relations', 'duration_ms': spatial_duration})}\n\n"
+            final_response = {
+                "query": request.query,
+                "geo_query": geo_query_result,
+                "result": feature_collection,
+            }
 
-                feature_collection = {
-                    "type": "FeatureCollection",
-                    "features": result_features,
-                }
+            yield {"type": "reasoning", "content": "Query processing completed"}
+            yield {"type": "result", "content": final_response}
+            yield {"type": "finish"}
 
-                final_response = {
-                    "query": request.query,
-                    "geo_query": geo_query_result,
-                    "result": feature_collection,
-                }
-
-                yield f"data: {json.dumps({'type': 'reasoning', 'content': 'Query processing completed'})}\n\n"
-                yield f"data: {json.dumps({'type': 'result', 'content': final_response})}\n\n"
-                yield f"data: {json.dumps({'type': 'finish'})}\n\n"
-
-        except Exception as e:
-            error_msg = f"Error during streaming: {str(e)}"
-            logger.exception("Error during streaming")
-            yield f"data: {json.dumps({'type': 'error', 'content': error_msg})}\n\n"
-
-    return StreamingResponse(event_generator(), media_type="text/event-stream")
+    except Exception as e:
+        logger.exception("Error during streaming")
+        yield {"type": "error", "content": f"Error during streaming: {str(e)}"}
 
 
 @geo_mcp.tool()
@@ -274,5 +269,5 @@ async def parse_geo_query(user_query: str) -> dict[str, Any]:
 geo_mcp.settings.streamable_http_path = "/"
 app.mount("/mcp", geo_mcp.streamable_http_app())
 
-# Mount static files (must be last)
-app.mount("/", StaticFiles(directory="demo/static", html=True), name="static")
+# Serve the frontend (low-priority route, matched after API routes)
+app.frontend("/", directory="demo/static")
