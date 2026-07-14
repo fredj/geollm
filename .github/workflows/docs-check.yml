@@ -49,7 +49,7 @@ jobs:
         run: uv run pdoc etter --docformat google -t docs/pdoc-templates -o docs/public/api/
 
       - name: Set up Node
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version: "24"
           cache: npm
