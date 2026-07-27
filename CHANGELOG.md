@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.7.0](https://github.com/geoblocks/etter/compare/v0.6.0...v0.7.0) (2026-07-24)
+
+
+### Features
+
+* add Python 3.14 support ([#201](https://github.com/geoblocks/etter/issues/201)) ([fb8bab0](https://github.com/geoblocks/etter/commit/fb8bab0c5d5f0398b8ef39240bc16bdb3412d6cb))
+
+
+### Bug Fixes
+
+* correct word_similarity argument order in PostGIS fuzzy search ([#215](https://github.com/geoblocks/etter/issues/215)) ([02e5155](https://github.com/geoblocks/etter/commit/02e515587864ad8d6d96e56092d1edfdf77953bb))
+* merge segments and serialize GeoDataFrame values correctly ([#191](https://github.com/geoblocks/etter/issues/191)) ([747b71c](https://github.com/geoblocks/etter/commit/747b71c1808d0236ce5423b2a8f277e9626455db))
+
 ## [0.6.0](https://github.com/geoblocks/etter/compare/v0.5.0...v0.6.0) (2026-06-19)
 
 
