@@ -29,7 +29,7 @@ class GeoFilterParser:
     Examples:
         Basic usage:
         >>> from langchain.chat_models import init_chat_model
-        >>> llm = init_chat_model(model="gpt-4o", model_provider="openai", api_key="sk-...")
+        >>> llm = init_chat_model(model="gpt-4o", api_key="sk-...")
         >>> parser = GeoFilterParser(llm=llm)
         >>> result = parser.parse("restaurants in Lausanne")
         >>> print(result.reference_location.name)
@@ -69,7 +69,7 @@ class GeoFilterParser:
         Example:
             >>> from langchain.chat_models import init_chat_model
             >>> from etter.datasources.swissnames3d import SwissNames3DSource
-            >>> llm = init_chat_model(model="gpt-4o", model_provider="openai", temperature=0)
+            >>> llm = init_chat_model(model="gpt-4o", temperature=0)
             >>> datasource = SwissNames3DSource("data/")
             >>> parser = GeoFilterParser(llm=llm, datasource=datasource)
         """

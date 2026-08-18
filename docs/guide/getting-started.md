@@ -49,7 +49,7 @@ from langchain.chat_models import init_chat_model
 from etter import GeoFilterParser
 import os
 
-llm = init_chat_model(model="gpt-4o", model_provider="openai", temperature=0, api_key=os.getenv("LLM_API_KEY"))
+llm = init_chat_model(model="gpt-4o", temperature=0, api_key=os.getenv("LLM_API_KEY"))
 
 parser = GeoFilterParser(llm=llm)
 result = parser.parse("north of Lausanne")
