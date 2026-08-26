@@ -51,6 +51,33 @@ python -m pytest tests/test_models.py::test_reference_location -v
 - Use `python -m pytest` instead of just `pytest` to ensure the correct Python environment is used
 - Some tests may be skipped if environment variables (e.g., `LLM_API_KEY`) are not set
 
+## Commit Messages & Releases
+
+Commit titles (and PR titles — `pr-title.yml` enforces this independently) must follow
+[Conventional Commits](https://www.conventionalcommits.org/) (`type: description`, e.g.
+`fix: ...`, `feat: ...`). `release-please` (`.github/workflows/publish.yml`, config in
+`release-please-config.json`) parses these on every push to `main` to decide the version
+bump and build `CHANGELOG.md`.
+
+`release-please-config.json` has no `changelog-sections` override, so its **default**
+visibility rules apply:
+
+- **Bumps the version and shows up in `CHANGELOG.md`**: `feat` (minor), `fix` / `perf`
+  (patch), `revert` (patch), or any type with a `!`/`BREAKING CHANGE:` footer (major).
+- **Parsed but hidden from `CHANGELOG.md`, no version bump**: `refactor`, `chore`, `docs`,
+  `style`, `test`, `build`, `ci`. These commits are still folded into the next release's
+  commit range — they just never bumped the version or appeared themselves.
+
+If a change should be visible in the changelog (e.g. a refactor worth calling out to
+users), title it `fix:` or `feat:` rather than `refactor:`/`chore:` — don't add a
+`changelog-sections` override for this on a case-by-case basis unless asked.
+
+This repo allows squash, merge-commit, and rebase merges (all three, not squash-only).
+For a squash merge, GitHub uses the single commit's title verbatim only if the PR has
+exactly one commit; with multiple commits it falls back to the **PR title**
+(`squash_merge_commit_title: COMMIT_OR_PR_TITLE`). Keep the PR title and its commit
+title(s) consistent so the type prefix survives whichever merge strategy is used.
+
 ## Documentation Review
 
 Documentation must remain in sync with code implementation. Before marking changes as complete, audit the affected documentation files against the corresponding Python code.
