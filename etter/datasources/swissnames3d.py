@@ -298,15 +298,20 @@ class SwissNames3DSource:
                     return col
         return None
 
+    def _row_type(self, idx: int) -> str:
+        """Return a row's normalized type without building its full Feature (geometry, etc.)."""
+        assert self._gdf is not None
+        row = self._gdf.iloc[idx]
+        raw_type = str(row[self._type_col]) if self._type_col and row.get(self._type_col) else "unknown"
+        return _objektart_to_type(raw_type)
+
     def _row_to_feature(self, idx: int) -> Feature:
         """Convert a GeoDataFrame row to a GeoJSON Feature dict with WGS84 geometry."""
         assert self._gdf is not None
         row = self._gdf.iloc[idx]
 
         name = str(row[self._name_col])
-
-        raw_type = str(row[self._type_col]) if self._type_col and row.get(self._type_col) else "unknown"
-        normalized_type = _objektart_to_type(raw_type)
+        normalized_type = self._row_type(idx)
 
         feature_id = str(row[self._id_col]) if self._id_col and row.get(self._id_col) else str(idx)
 
@@ -364,18 +369,19 @@ class SwissNames3DSource:
         if not indices:
             indices = self._fuzzy_search(normalized)
 
-        features = [self._row_to_feature(idx) for idx in indices]
-
-        # Filter by type if type hint provided.
+        # Filter by type if type hint provided, before building the (geometry-heavy) Feature
+        # for each row — so rows dropped by the filter skip that work entirely.
         # Expand via the type hierarchy so that category hints (e.g. "water") match
         # all concrete types within that category ("lake", "river", "pond", ...).
         if type is not None:
             matching_types = get_matching_types(type)
             if matching_types:
-                features = [f for f in features if f["properties"].get("type") in matching_types]
+                indices = [idx for idx in indices if self._row_type(idx) in matching_types]
             else:
                 # Unknown type hint, fall back to exact string match
-                features = [f for f in features if f["properties"].get("type") == type.lower()]
+                indices = [idx for idx in indices if self._row_type(idx) == type.lower()]
+
+        features = [self._row_to_feature(idx) for idx in indices]
 
         features = merge_segments(features)
         return features[:max_results]

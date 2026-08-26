@@ -360,13 +360,19 @@ class IGNBDCartoSource:
                         self._token_index[token] = set()
                     self._token_index[token].add(key)
 
+    def _row_type(self, idx: int) -> str:
+        """Return a row's normalized type without building its full Feature (geometry, etc.)."""
+        assert self._gdf is not None
+        row = self._gdf.iloc[idx]
+        return str(row[_TYPE_COL]) if pd.notna(row.get(_TYPE_COL)) else "unknown"
+
     def _row_to_feature(self, idx: int) -> Feature:
         """Convert a GeoDataFrame row to a GeoJSON Feature dict (WGS84)."""
         assert self._gdf is not None
         row = self._gdf.iloc[idx]
 
         name = str(row[_NAME_COL])
-        normalized_type = str(row[_TYPE_COL]) if pd.notna(row.get(_TYPE_COL)) else "unknown"
+        normalized_type = self._row_type(idx)
         feature_id = str(row["cleabs"]) if pd.notna(row.get("cleabs")) else str(idx)
 
         geom = row.geometry
@@ -423,15 +429,17 @@ class IGNBDCartoSource:
         if not indices:
             indices = self._fuzzy_search(normalized)
 
-        features = [self._row_to_feature(idx) for idx in indices]
-
+        # Filter by type if type hint provided, before building the (geometry-heavy) Feature
+        # for each row — so rows dropped by the filter skip that work entirely.
         if type is not None:
             matching_types = get_matching_types(type)
             logger.debug("Filtering results by type hint %r → matching types: %s", type, matching_types)
             if matching_types:
-                features = [f for f in features if f["properties"].get("type") in matching_types]
+                indices = [idx for idx in indices if self._row_type(idx) in matching_types]
             else:
-                features = [f for f in features if f["properties"].get("type") == type.lower()]
+                indices = [idx for idx in indices if self._row_type(idx) == type.lower()]
+
+        features = [self._row_to_feature(idx) for idx in indices]
 
         features = merge_segments(features)
 

@@ -33,7 +33,7 @@ def test_load_data(source):
     """Test that data loads and columns are detected."""
     source._ensure_loaded()
     assert source._gdf is not None
-    assert len(source._gdf) == 5  # 5 features in fixture
+    assert len(source._gdf) == 6  # 6 features in fixture
 
 
 def test_search_exact(source):
@@ -136,6 +136,17 @@ def test_search_type_exact_still_works(source):
     # A mismatched concrete type returns nothing
     results_none = source.search("Lac Léman", type="river")
     assert len(results_none) == 0
+
+
+def test_search_type_filter_merges_before_truncating(source):
+    """The type filter is applied to row indices before building Features (perf optimization),
+    but merging disconnected segments of the same type must still see the full filtered set —
+    not have segments silently dropped by max_results before they can be merged."""
+    results = source.search("Rhône", type="river", max_results=1)
+    assert len(results) == 1
+    # Both fixture segments (uuid-rhone, uuid-rhone-2) must be merged into this one result,
+    # not just the first segment found.
+    assert "MultiLineString" in results[0]["geometry"]["type"] or results[0]["geometry"]["type"] == "GeometryCollection"
 
 
 # Tests for real SwissNames3D shapefiles

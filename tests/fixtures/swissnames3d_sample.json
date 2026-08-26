@@ -78,6 +78,21 @@
     {
       "type": "Feature",
       "properties": {
+        "UUID": "uuid-rhone-2",
+        "NAME": "Rhône",
+        "OBJEKTART": "Fliessgewaesser"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [2300000.0, 1080000.0],
+          [2200000.0, 1070000.0]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
         "UUID": "uuid-zurich",
         "NAME": "Zürich",
         "OBJEKTART": "Ort",
