@@ -93,7 +93,8 @@ class TestApplySpatialRelationFormat:
         relation = SpatialRelation(relation="in", category="containment")
         result = apply_spatial_relation(POINT_GEOM, relation)
         assert isinstance(result, dict)
-        assert result["type"] == "Point"
+        # Containment on a point falls back to a buffer (see test_spatial.py).
+        assert result["type"] == "Polygon"
 
     def test_geojson_explicit(self):
         relation = SpatialRelation(relation="in", category="containment")
@@ -104,7 +105,8 @@ class TestApplySpatialRelationFormat:
         relation = SpatialRelation(relation="in", category="containment")
         result = apply_spatial_relation(POINT_GEOM, relation, geometry_format="wkt")
         assert isinstance(result, str)
-        assert result.startswith("POINT")
+        # Containment on a point falls back to a buffer (see test_spatial.py).
+        assert result.startswith("POLYGON")
 
     def test_wkb_containment(self):
         relation = SpatialRelation(relation="in", category="containment")
