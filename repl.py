@@ -84,9 +84,6 @@ def main():
         console.print("[bold red]Error:[/bold red] LLM_API_KEY environment variable not set")
         return
     LLM_MODEL = os.getenv("LLM_MODEL", "gpt-4o")
-    if not LLM_MODEL:
-        console.print("[bold red]Error:[/bold red] LLM_MODEL environment variable not set")
-        return
 
     with console.status("[bold blue]Initializing etter...[/bold blue]"):
         try:
