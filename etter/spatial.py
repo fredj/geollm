@@ -150,7 +150,16 @@ def apply_spatial_relation(
         buffer_config = _refine_buffer_config(geom, buffer_config, relation)
 
     if relation.category == "containment":
-        result = geom_dict
+        if geom.geom_type in ("Point", "MultiPoint", "LineString", "MultiLineString"):
+            # A point/line reference can't meaningfully "contain" anything (a search
+            # target almost never touches an exact point or crosses a line exactly);
+            # fall back to a buffer sized from the reference's own (zero) area.
+            fallback_config = _refine_buffer_config(
+                geom, BufferConfig(distance_m=0, buffer_from="boundary", inferred=True), relation
+            )
+            result = _apply_buffer(geom, fallback_config)
+        else:
+            result = geom_dict
     elif relation.category == "buffer":
         if buffer_config is None:
             raise ValueError(f"Buffer relation '{relation.relation}' requires buffer_config")

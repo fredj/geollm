@@ -8,13 +8,43 @@ from etter.models import BufferConfig, SpatialRelation
 from etter.spatial import apply_spatial_relation
 
 
-def test_containment_passthrough():
-    """Test that containment returns geometry unchanged."""
-    geom = {"type": "Point", "coordinates": [0, 0]}
+def test_containment_polygon_passthrough():
+    """Test that containment returns a polygon reference geometry unchanged."""
+    geom = {"type": "Polygon", "coordinates": [[[0, 0], [1, 0], [1, 1], [0, 1], [0, 0]]]}
     relation = SpatialRelation(relation="in", category="containment")
 
     result = apply_spatial_relation(geom, relation)
     assert result == geom
+
+
+def test_containment_point_falls_back_to_buffer():
+    """A point reference can't meaningfully "contain" anything; containment must
+    fall back to a buffer instead of the (near-always-empty) unchanged point."""
+    geom = {"type": "Point", "coordinates": [0, 0]}
+    relation = SpatialRelation(relation="in", category="containment")
+
+    result = apply_spatial_relation(geom, relation)
+
+    assert result["type"] != "Point"
+    result_shape = shape(result)
+    assert result_shape.area > 0
+    assert result_shape.contains(Point(0, 0))
+
+
+def test_containment_linestring_falls_back_to_buffer():
+    """A line reference falls back to a buffer covering its whole length, not just
+    a buffer around its centroid/midpoint."""
+    geom = {"type": "LineString", "coordinates": [[0.0, 0.0], [1.0, 0.0]]}
+    relation = SpatialRelation(relation="in", category="containment")
+
+    result = apply_spatial_relation(geom, relation)
+
+    assert result["type"] != "LineString"
+    result_shape = shape(result)
+    assert result_shape.area > 0
+    # Buffered along the whole line, not just around the midpoint.
+    assert result_shape.contains(Point(0.0, 0.0))
+    assert result_shape.contains(Point(1.0, 0.0))
 
 
 def test_around_buffer():
