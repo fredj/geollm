@@ -27,7 +27,6 @@ Expected data layout (produced by scripts/extract_bdcarto.sh):
 """
 
 import logging
-import unicodedata
 from pathlib import Path
 from typing import Any, cast
 
@@ -36,7 +35,9 @@ import pandas as pd
 from geojson import Feature
 from shapely.geometry import mapping
 
-from .location_types import TypeMap, fuzzy_search_index, get_matching_types, merge_segments, to_serializable
+from .geo_dataframe_source import GeoDataFrameSource
+from .location_types import TypeMap, get_matching_types, merge_segments, to_serializable
+from .text import normalize_name
 
 logger = logging.getLogger(__name__)
 
@@ -191,12 +192,6 @@ def _build_type_map() -> TypeMap:
 IGN_BDCARTO_TYPE_MAP: TypeMap = _build_type_map()
 
 
-def _normalize_name(name: str) -> str:
-    """Lowercase, strip diacritics for accent-insensitive matching."""
-    nfkd = unicodedata.normalize("NFKD", name)
-    return "".join(c for c in nfkd if not unicodedata.combining(c)).lower().strip()
-
-
 _FR_ARTICLES = ("le ", "la ", "les ", "l'", "l'", "de ", "du ", "des ")
 
 
@@ -208,7 +203,7 @@ def _index_keys(name: str) -> list[str]:
     leading French article stripped, so that searching for "Rhône" finds
     features stored as "le Rhône".
     """
-    full = _normalize_name(name)
+    full = normalize_name(name)
     keys = [full]
     for article in _FR_ARTICLES:
         if full.startswith(article):
@@ -239,7 +234,7 @@ def _assign_type_col(gdf: gpd.GeoDataFrame, cfg: dict[str, Any]) -> None:
         gdf[_TYPE_COL] = "unknown"
 
 
-class IGNBDCartoSource:
+class IGNBDCartoSource(GeoDataFrameSource):
     """
     Geographic data source backed by IGN's BD-CARTO 5.0 dataset.
 
@@ -269,15 +264,7 @@ class IGNBDCartoSource:
         self._gdf: gpd.GeoDataFrame | None = None
         self._name_index: dict[str, list[int]] = {}
         self._token_index: dict[str, set[str]] = {}
-
-    def preload(self) -> None:
-        """Eagerly load data. Call at startup to avoid first-query latency."""
-        self._ensure_loaded()
-
-    def _ensure_loaded(self) -> None:
-        if self._gdf is not None:
-            return
-        self._load_data()
+        self._id_col: str | None = "cleabs"
 
     def _load_data(self) -> None:
         if self._data_path.is_dir():
@@ -423,7 +410,7 @@ class IGNBDCartoSource:
         """
         self._ensure_loaded()
 
-        normalized = _normalize_name(name)
+        normalized = normalize_name(name)
         indices = self._name_index.get(normalized, [])
 
         if not indices:
@@ -444,36 +431,6 @@ class IGNBDCartoSource:
         features = merge_segments(features)
 
         return features[:max_results]
-
-    def _fuzzy_search(self, normalized: str, threshold: float = 75.0) -> list[int]:
-        return fuzzy_search_index(normalized, self._token_index, self._name_index, threshold)
-
-    def get_by_id(self, feature_id: str) -> Feature | None:
-        """
-        Get a feature by its ``cleabs`` identifier or row index.
-
-        Args:
-            feature_id: ``cleabs`` string or integer row index.
-
-        Returns:
-            Matching GeoJSON Feature dict, or ``None``.
-        """
-        self._ensure_loaded()
-        assert self._gdf is not None
-
-        if "cleabs" in self._gdf.columns:
-            matches = self._gdf[self._gdf["cleabs"].astype(str) == feature_id]
-            if not matches.empty:
-                return self._row_to_feature(matches.index[0])
-
-        try:
-            idx = int(feature_id)
-            if 0 <= idx < len(self._gdf):
-                return self._row_to_feature(idx)
-        except ValueError:
-            pass
-
-        return None
 
     def get_available_types(self) -> list[str]:
         """

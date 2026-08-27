@@ -7,7 +7,6 @@ search functionality with coordinate conversion to WGS84 GeoJSON.
 Data source: https://www.swisstopo.admin.ch/en/landscape-model-swissnames3d
 """
 
-import unicodedata
 from pathlib import Path
 from typing import Any
 
@@ -17,7 +16,9 @@ from geojson import Feature
 from shapely import force_2d
 from shapely.geometry import mapping
 
-from .location_types import TypeMap, fuzzy_search_index, get_matching_types, merge_segments, to_serializable
+from .geo_dataframe_source import GeoDataFrameSource
+from .location_types import TypeMap, get_matching_types, merge_segments, to_serializable
+from .text import normalize_name
 
 # Map normalized, grouped types to their OBJEKTART values.
 # Each type groups related OBJEKTART values (e.g., lake groups: See, Seeteil).
@@ -141,20 +142,7 @@ def _objektart_to_type(objektart: str) -> str:
     return objektart.lower()
 
 
-def _normalize_name(name: str) -> str:
-    """
-    Normalize a name for case-insensitive, accent-insensitive matching.
-
-    Strips diacritics (é→e, ü→u, etc.) and lowercases.
-    """
-    # Decompose unicode characters (é → e + combining accent)
-    nfkd = unicodedata.normalize("NFKD", name)
-    # Strip combining characters (accents, umlauts, etc.)
-    stripped = "".join(c for c in nfkd if not unicodedata.combining(c))
-    return stripped.lower().strip()
-
-
-class SwissNames3DSource:
+class SwissNames3DSource(GeoDataFrameSource):
     """
     Geographic data source backed by swisstopo's swissNAMES3D dataset.
 
@@ -186,16 +174,6 @@ class SwissNames3DSource:
         self._type_col: str | None = None
         self._id_col: str | None = None
         self._extra_cols: list[str] = []
-
-    def preload(self) -> None:
-        """Eagerly load data. Call at startup to avoid first-query latency."""
-        self._ensure_loaded()
-
-    def _ensure_loaded(self) -> None:
-        """Load data lazily on first access."""
-        if self._gdf is not None:
-            return
-        self._load_data()
 
     def _load_data(self) -> None:
         """Load SwissNames3D data and build the name index."""
@@ -264,7 +242,7 @@ class SwissNames3DSource:
         for idx, name in enumerate(self._gdf[self._name_col]):
             if not isinstance(name, str) or not name.strip():
                 continue
-            normalized = _normalize_name(name)
+            normalized = normalize_name(name)
             if normalized not in self._name_index:
                 self._name_index[normalized] = []
             self._name_index[normalized].append(idx)
@@ -362,7 +340,7 @@ class SwissNames3DSource:
         """
         self._ensure_loaded()
 
-        normalized = _normalize_name(name)
+        normalized = normalize_name(name)
         indices = self._name_index.get(normalized, [])
 
         # If no exact match, try fuzzy matching
@@ -385,37 +363,6 @@ class SwissNames3DSource:
 
         features = merge_segments(features)
         return features[:max_results]
-
-    def _fuzzy_search(self, normalized: str, threshold: float = 75.0) -> list[int]:
-        return fuzzy_search_index(normalized, self._token_index, self._name_index, threshold)
-
-    def get_by_id(self, feature_id: str) -> Feature | None:
-        """
-        Get a specific feature by its unique identifier.
-
-        Args:
-            feature_id: Unique identifier (UUID or row index).
-
-        Returns:
-            The matching GeoJSON Feature dict, or None if not found.
-        """
-        self._ensure_loaded()
-        assert self._gdf is not None
-
-        if self._id_col:
-            matches = self._gdf[self._gdf[self._id_col].astype(str) == feature_id]
-            if not matches.empty:
-                return self._row_to_feature(matches.index[0])
-
-        # Fallback: try as row index
-        try:
-            idx = int(feature_id)
-            if 0 <= idx < len(self._gdf):
-                return self._row_to_feature(idx)
-        except ValueError:
-            pass
-
-        return None
 
     def get_available_types(self) -> list[str]:
         """

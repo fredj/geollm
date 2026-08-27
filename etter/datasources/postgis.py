@@ -26,12 +26,12 @@ from __future__ import annotations
 
 import json
 import logging
-import unicodedata
 from typing import TYPE_CHECKING, Any
 
 from geojson import Feature
 
 from .location_types import TypeMap, get_matching_types, merge_segments
+from .text import normalize_name
 
 logger = logging.getLogger(__name__)
 
@@ -42,13 +42,6 @@ if TYPE_CHECKING:
 
     from sqlalchemy import Engine
     from sqlalchemy.engine import Connection, Row
-
-
-def _normalize_name(name: str) -> str:
-    """Normalize a name for accent- and case-insensitive matching."""
-    nfkd = unicodedata.normalize("NFKD", name)
-    stripped = "".join(c for c in nfkd if not unicodedata.combining(c))
-    return stripped.lower().strip()
 
 
 def _require_sqlalchemy() -> types.ModuleType:
@@ -362,7 +355,7 @@ class PostGISDataSource:
             LIMIT :limit
         """)  # noqa: S608
         params: dict[str, Any] = {
-            "query": _normalize_name(name),
+            "query": normalize_name(name),
             "limit": fetch_limit,
             **type_params,
         }
@@ -390,7 +383,7 @@ class PostGISDataSource:
         only).
         """
         type_clause, type_params = self._type_filter_sql(type_filter)
-        normalized = _normalize_name(name)
+        normalized = normalize_name(name)
         if self._check_unaccent(conn):
             name_expr = f"unaccent(lower({self._name_col}))"
             pattern = f"%{normalized}%"
@@ -425,7 +418,7 @@ class PostGISDataSource:
                 "pg_trgm extension not available. Fuzzy search disabled. Install it with: CREATE EXTENSION pg_trgm;"
             )
             return []
-        normalized_query = _normalize_name(name)
+        normalized_query = normalize_name(name)
         if self._check_unaccent(conn):
             name_expr = f"unaccent(lower({self._name_col}))"
         else:
