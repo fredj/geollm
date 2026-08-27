@@ -4,16 +4,17 @@ import logging
 import os
 import time
 from collections.abc import AsyncIterable
-from typing import Any
+from typing import Annotated, Any
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.sse import EventSourceResponse
 from langchain.chat_models import init_chat_model
+from langchain_core.rate_limiters import InMemoryRateLimiter
 from mcp.server.fastmcp import FastMCP
 from mcp.server.fastmcp.exceptions import ToolError
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from etter.datasources import CompositeDataSource, IGNBDCartoSource, PostGISDataSource, SwissNames3DSource
 from etter.datasources.ign_bdcarto import IGN_BDCARTO_TYPE_MAP
@@ -108,9 +109,10 @@ LLM_API_KEY = os.getenv("LLM_API_KEY")
 if not LLM_API_KEY:
     raise RuntimeError("LLM_API_KEY not set. Please set it in your .env file.")
 LLM_MODEL = os.getenv("LLM_MODEL", "gpt-4o")
-if not LLM_MODEL:
-    raise RuntimeError("LLM_MODEL not set. Please set it in your .env file.")
-llm = init_chat_model(model=LLM_MODEL, temperature=0, api_key=LLM_API_KEY)
+llm_rate_limiter = InMemoryRateLimiter(requests_per_second=0.5, max_bucket_size=5)
+llm = init_chat_model(
+    model=LLM_MODEL, temperature=0, api_key=LLM_API_KEY, max_tokens=600, rate_limiter=llm_rate_limiter
+)
 parser = GeoFilterParser(llm, datasource=datasource)
 
 
@@ -149,8 +151,11 @@ async def _run_geo_query(query: str) -> "QueryResponse":
     return QueryResponse(query=query, geo_query=geo_query, result=feature_collection)
 
 
+QueryString = Annotated[str, Field(min_length=1, max_length=300)]
+
+
 class QueryRequest(BaseModel):
-    query: str
+    query: QueryString
 
 
 class QueryResponse(BaseModel):
@@ -250,7 +255,7 @@ async def process_query_stream(request: QueryRequest) -> AsyncIterable[dict[str,
 
 
 @geo_mcp.tool()
-async def parse_geo_query(user_query: str) -> dict[str, Any]:
+async def parse_geo_query(user_query: QueryString) -> dict[str, Any]:
     """
     Transforms natural language location queries into structured geographic filters
     that can be used by search engines and spatial databases.
