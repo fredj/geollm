@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.7.1](https://github.com/geoblocks/etter/compare/v0.7.0...v0.7.1) (2026-08-27)
+
+
+### Bug Fixes
+
+* consolidate duplicated datasource helper code ([#277](https://github.com/geoblocks/etter/issues/277)) ([b5a1fd7](https://github.com/geoblocks/etter/commit/b5a1fd7c87f5c3d03d2bf07e9c2f6e6a49796d87))
+
+
+### Performance Improvements
+
+* filter by type before building Features in search() ([#276](https://github.com/geoblocks/etter/issues/276)) ([b455935](https://github.com/geoblocks/etter/commit/b4559351122f7e0aaf8f5a7aef2c92ccab4baa57))
+
+
+### Documentation
+
+* document commit-type visibility rules for release-please ([#278](https://github.com/geoblocks/etter/issues/278)) ([c3d0f89](https://github.com/geoblocks/etter/commit/c3d0f89e5e24af4a4c679aad6f5ed99f4298a810))
+* drop redundant model_provider from init_chat_model docstring examples ([#261](https://github.com/geoblocks/etter/issues/261)) ([5a75a59](https://github.com/geoblocks/etter/commit/5a75a596482ca0f818c1f9bae0eca9b65ad107be))
+
 ## [0.7.0](https://github.com/geoblocks/etter/compare/v0.6.0...v0.7.0) (2026-07-24)
 
 
