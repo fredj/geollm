@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>etter Demo</title>
+    <link rel="icon" href="/favicon.png" type="image/png" />
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
     <!-- OpenLayers CSS -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ol@v10.8.0/ol.css" type="text/css" />
@@ -347,8 +348,6 @@
       }
 
       function displayResults(data, statusDiv) {
-        console.log(data.geo_query);
-
         // Add features to map
         const format = new ol.format.GeoJSON({
           dataProjection: "EPSG:4326",
@@ -362,7 +361,7 @@
         if (features.length > 0) {
           const extent = vectorSource.getExtent();
           map.getView().fit(extent, {
-            padding: [50, 50, 50, 50],
+            padding: [350, 50, 50, 50],
             duration: 1000,
             maxZoom: 14,
           });
