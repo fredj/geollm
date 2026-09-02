@@ -1,5 +1,5 @@
 # Stage 1: Vite frontend build
-FROM node:22-alpine AS builder
+FROM node:24-alpine AS builder
 WORKDIR /app
 COPY demo/etter-mcp-app/package.json demo/etter-mcp-app/package-lock.json ./
 RUN npm ci
@@ -23,7 +23,7 @@ EXPOSE 8000
 CMD ["uv", "run", "uvicorn", "demo.main:app", "--host", "0.0.0.0", "--port", "8000"]
 
 # Stage 3: TypeScript MCP proxy server
-FROM node:22-alpine AS ts-server
+FROM node:24-alpine AS ts-server
 WORKDIR /app
 COPY demo/etter-mcp-app/package.json demo/etter-mcp-app/package-lock.json ./
 RUN npm ci
