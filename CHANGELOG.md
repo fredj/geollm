@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.8.0](https://github.com/geoblocks/etter/compare/v0.7.1...v0.8.0) (2026-09-09)
+
+
+### Features
+
+* **demo:** guard the LLM-backed endpoints against runaway cost and abuse ([#281](https://github.com/geoblocks/etter/issues/281)) ([c634539](https://github.com/geoblocks/etter/commit/c63453948d0ddef2e7ccc5cac0374fe8476e65e4))
+
+
+### Bug Fixes
+
+* fall back to a buffer for containment on point/line geometries ([#279](https://github.com/geoblocks/etter/issues/279)) ([825f306](https://github.com/geoblocks/etter/commit/825f306f1034807ef82bd4dfc58a111c0e187f7e))
+
 ## [0.7.1](https://github.com/geoblocks/etter/compare/v0.7.0...v0.7.1) (2026-08-27)
 
 
